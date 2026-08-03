@@ -15,7 +15,7 @@
   <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   
-  <!-- SheetJS (スタイル適用可能な xlsx-js-style に変更) -->
+  <!-- SheetJS -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 
   <style>
@@ -219,6 +219,55 @@
       });
     });
 
+    // 初期表示用の日付を計算 (当日を基準とする)
+    const todayDateObj = new Date();
+    const getLocalDateString = (dateObj) => {
+      const y = dateObj.getFullYear();
+      const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const d = String(dateObj.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+    const todayStr = getLocalDateString(todayDateObj);
+
+    let initialMonth = months.length > 0 ? months[0] : 8;
+    let initialWeekId = weeksData.length > 0 ? weeksData[0].id : '';
+    let initialDate = weeksData.length > 0 ? weeksData[0].dates[0] : '';
+    let todayFound = false;
+
+    // 当日の日付がデータ内に存在するか検索
+    for (const week of weeksData) {
+      if (week.dates.includes(todayStr)) {
+        initialMonth = week.month;
+        initialWeekId = week.id;
+        initialDate = todayStr;
+        todayFound = true;
+        break;
+      }
+    }
+
+    // 当日が含まれていない場合は、当日以降の最初の日付を探す
+    if (!todayFound) {
+      for (const week of weeksData) {
+        for (const dStr of week.dates) {
+          if (dStr >= todayStr) {
+            initialMonth = week.month;
+            initialWeekId = week.id;
+            initialDate = dStr;
+            todayFound = true;
+            break;
+          }
+        }
+        if (todayFound) break;
+      }
+      // 全て過去日付の場合は最後のデータを初期値にする
+      if (!todayFound && weeksData.length > 0) {
+        const lastWeek = weeksData[weeksData.length - 1];
+        initialMonth = lastWeek.month;
+        initialWeekId = lastWeek.id;
+        initialDate = lastWeek.dates[lastWeek.dates.length - 1];
+      }
+    }
+
     const getRoleColor = (role, isNewBooth = false) => {
       if (role === '休暇者') return 'bg-rose-100 text-rose-800 border-rose-300';
       if (isNewBooth) return 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-400 shadow-[0_0_10px_rgba(217,70,239,0.3)] ring-1 ring-fuchsia-300';
@@ -242,13 +291,11 @@
       const staffMap = {}; 
       booths.forEach((booth, localIndex) => {
         if (!booth.staff || booth.role === '上部EUS') return; 
-        // (潤) 以外の括弧を削除して名前を抽出する
         const names = booth.staff.split(/[\s,、・]+|or/).map(n => n.replace(/[（\(](?!潤[）\)]).*?[）\)]/g, '').trim()).filter(n => {
           if (n.length === 0) return false;
           if (n === 'なし') return false;
           if (n.includes('年目')) return false;
           if (n === 'back' || n === 'up') return false;
-          // ✕、☓、×、✗、英字のXなどは重複チェックから除外
           if (/^[✕☓×✗xX]+$/.test(n)) return false; 
           return true;
         });
@@ -288,9 +335,10 @@
       const [holidays, setHolidays] = useState(defaultHolidays);
       const [schedulesMetadata, setSchedulesMetadata] = useState({});
       
-      const [selectedMonth, setSelectedMonth] = useState(8);
-      const [selectedWeek, setSelectedWeek] = useState(weeksData[0].id);
-      const [selectedDate, setSelectedDate] = useState(weeksData[0].dates[0]);
+      // 計算した初期値をセットする
+      const [selectedMonth, setSelectedMonth] = useState(initialMonth);
+      const [selectedWeek, setSelectedWeek] = useState(initialWeekId);
+      const [selectedDate, setSelectedDate] = useState(initialDate);
       
       const [isAdmin, setIsAdmin] = useState(false);
       const [isEditMode, setIsEditMode] = useState(false);
@@ -450,9 +498,25 @@
         return len;
       };
 
-      const handleExportExcel = () => {
-        const week = weeksData.find(w => w.id === selectedWeek);
-        const dates = week.dates;
+      // エクスポートのタイプ (週: 'week', 月: 'month') を受け取るように変更
+      const handleExportExcel = (exportType = 'week') => {
+        let dates = [];
+        let exportTitle = "";
+        
+        if (exportType === 'month') {
+          // 月ごと出力の場合
+          const monthWeeks = weeksData.filter(w => w.month === selectedMonth);
+          monthWeeks.forEach(w => {
+            dates = dates.concat(w.dates);
+          });
+          exportTitle = `${selectedMonth}月分`;
+        } else {
+          // 週ごと出力の場合
+          const week = weeksData.find(w => w.id === selectedWeek);
+          dates = week.dates;
+          exportTitle = `週_${dates[0].replace(/-/g, '')}`;
+        }
+
         const weekSchedules = dates.map(d => pendingChanges[d] || schedules[d] || defaultSchedules[d]);
         const weekDefaultSchedules = dates.map(d => defaultSchedules[d]);
         const weekHolidays = dates.map(d => pendingHolidays[d] !== undefined ? pendingHolidays[d] : holidays[d]);
@@ -552,7 +616,7 @@
 
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "スケジュール");
-        XLSX.writeFile(wb, `業務変更表_${dates[0].replace(/-/g, '')}.xlsx`);
+        XLSX.writeFile(wb, `業務変更表_${exportTitle}.xlsx`);
       };
 
       const handleLogin = (e) => {
@@ -583,19 +647,16 @@
       const boothsData = activeData.slice(1);
       const defaultBoothsData = defaultSchedules[selectedDate].slice(1);
 
-      // Parse leave names with optional period restrictions (AM/PM/午前/午後)
       const parseLeaveNames = (leaveStr) => {
         const leaves = [];
         const entries = leaveStr.split(/[\s,、・]+|or/).filter(e => e.trim().length > 0);
         
         entries.forEach(entry => {
-          // (潤) 以外の括弧を削除して名前を抽出
           let name = entry.replace(/[（\(](?!潤[）\)]).*?[）\)]/g, '').trim();
-          let leavePeriod = 'ALL'; // Default: leave applies to all day
+          let leavePeriod = 'ALL'; 
           
           if (name.length === 0) return;
 
-          // Check if the original entry contains period specifiers in brackets
           const originalWithBracketsMatch = entry.match(/[（\(](?!潤[）\)]).*?[）\)]/);
           if (originalWithBracketsMatch) {
             const reason = originalWithBracketsMatch[0].toUpperCase();
@@ -688,14 +749,26 @@
                     </button>
                   ))}
                 </div>
-                <button
-                  onClick={handleExportExcel}
-                  className="flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 px-2 py-1.5 rounded shrink-0 transition-colors font-bold shadow-sm"
-                  title="表示されている期間をExcelに出力"
-                >
-                  <IconDownload className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Excel出力</span>
-                </button>
+                
+                {/* Excel出力を2つのボタンに分割 */}
+                <div className="flex gap-1.5 shrink-0">
+                  <button
+                    onClick={() => handleExportExcel('week')}
+                    className="flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 px-2 py-1.5 rounded transition-colors font-bold shadow-sm"
+                    title="表示されている週をExcelに出力"
+                  >
+                    <IconDownload className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">週出力</span>
+                  </button>
+                  <button
+                    onClick={() => handleExportExcel('month')}
+                    className="flex items-center gap-1 text-xs bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 px-2 py-1.5 rounded transition-colors font-bold shadow-sm"
+                    title="表示されている月全体をExcelに出力"
+                  >
+                    <IconDownload className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">月出力</span>
+                  </button>
+                </div>
               </div>
 
               <div className="flex overflow-x-auto gap-1.5 hide-scrollbar mt-2">
@@ -805,7 +878,6 @@
                   </div>
 
                   <div className="flex flex-col">
-                    {}
                     {boothsData.map((item, localIndex) => {
                       const dataIndex = localIndex + 1;
                       
@@ -816,14 +888,11 @@
                       const currentStaff = item.staff;
                       const changed = isNewBooth || defaultStaff !== currentStaff;
                       
-                      // Extract names from the current booth
                       const currentBoothNames = currentStaff.split(/[\s,、・]+|or/).map(n => n.replace(/[（\(].*?[）\)]/g, '').trim()).filter(n => n.length > 0);
                       const currentBoothPeriod = getPeriod(item.role);
 
-                      // Find conflicts specifically considering AM/PM leaves
                       const conflictLeavesForThisBooth = parsedLeaves.filter(leave => {
                          if (!currentBoothNames.includes(leave.name)) return false;
-                         // Conflict occurs if leave is ALL day, or if the leave period matches the booth's period
                          return leave.leavePeriod === 'ALL' || leave.leavePeriod === currentBoothPeriod;
                       });
 
