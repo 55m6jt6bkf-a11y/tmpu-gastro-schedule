@@ -453,7 +453,6 @@
         setIsEditMode(false);
       };
 
-      // Excel出力
       const handleExportExcel = () => {
         const week = weeksData.find(w => w.id === selectedWeek);
         const dates = week.dates;
@@ -465,6 +464,30 @@
           dayData.forEach(item => {
             if (!allRoles.includes(item.role)) allRoles.push(item.role);
           });
+        });
+
+        // 役割の並び順を定義（新患④が新患③の次に来るように、論理的な順序を設定）
+        const roleOrder = [
+          '休暇者',
+          '新患①', '新患②', '新患③', '新患④',
+          'EGD①', 'EGD②', 'EGD③',
+          'EUS', '上部EUS',
+          'CS①', 'CS②', '透視CS', '午後CS', '若林CS', '若林午後CS',
+          '専攻医AUS',
+          'back up',
+          '若林EGD', '仙台健診', '一番町', '涌谷', '刈田病院', '真壁病院', '矢本内科',
+          '健診プラザ', '渡辺病院', '佐藤胃腸外科', 'ゆうファミリー', '女川EGD&CS',
+          '高砂内科', '循環器センター', '葵会EGD', '米谷病院'
+        ];
+
+        // 抽出した役割を定義した順序にソート（定義にない新規枠は右端へ）
+        allRoles.sort((a, b) => {
+          let indexA = roleOrder.indexOf(a);
+          let indexB = roleOrder.indexOf(b);
+          if (indexA === -1) indexA = 999;
+          if (indexB === -1) indexB = 999;
+          if (indexA !== indexB) return indexA - indexB;
+          return a.localeCompare(b);
         });
 
         // 行1: ヘッダー (縦に日付、横にブース)
@@ -488,22 +511,31 @@
             const currentItem = rowData.find(item => item.role === role);
             const defaultItem = defaultData.find(item => item.role === role);
             
+            // その曜日に元々存在せず、追加もされていないブースは空欄にする
+            if (!currentItem && !defaultItem) {
+              row.push({ v: "", t: 's', s: { alignment: { vertical: "center" } } });
+              return;
+            }
+
             const currentStaff = currentItem ? currentItem.staff : '';
             const defaultStaff = defaultItem ? defaultItem.staff : null;
-            
-            const isNewBooth = defaultStaff === null;
-            const changed = isNewBooth || defaultStaff !== currentStaff;
             
             let cellValue = currentStaff;
             let isRed = false;
 
-            // 変更がある場合はテキストと色を変える
-            if (changed) {
-              isRed = true;
-              if (isNewBooth) {
+            if (defaultStaff === null) {
+              // 元々ない枠が追加されている場合
+              if (currentStaff !== '') {
+                isRed = true;
                 cellValue = `【追加枠】\n${currentStaff}`;
               } else {
-                cellValue = `旧: ${defaultStaff}\n新: ${currentStaff}`;
+                cellValue = ""; // 追加されたが空欄の場合
+              }
+            } else {
+              // 元々ある枠に変更があった場合
+              if (currentStaff !== defaultStaff) {
+                isRed = true;
+                cellValue = `旧: ${defaultStaff}\n新: ${currentStaff || '(なし)'}`;
               }
             }
             
