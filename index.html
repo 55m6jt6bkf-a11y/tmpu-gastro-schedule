@@ -1,0 +1,645 @@
+import React, { useState, useEffect } from 'react';
+import { Calendar, Edit, Save, Lock, X, LogOut, AlertCircle, ShieldAlert, Loader2, ArrowRight, AlertTriangle } from 'lucide-react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, collection, doc, setDoc, onSnapshot } from 'firebase/firestore';
+
+// ============================================================================
+// Firebase 初期化 (あなたの設定に書き換えました)
+// ============================================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyBhzyEtJ61cm4IP-sPru28xke-a1AoxvII",
+  authDomain: "gastro-schedule.firebaseapp.com",
+  projectId: "gastro-schedule",
+  storageBucket: "gastro-schedule.firebasestorage.app",
+  messagingSenderId: "546097500183",
+  appId: "1:546097500183:web:d760c76fa15bbcf9fb8c52"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// データを保存する場所の名前
+const COLLECTION_NAME = 'schedules'; 
+
+// 月〜金の定期出番テンプレート
+const weeklyPattern = [
+  // 月曜
+  [
+    { role: '休暇者', staff: '' },
+    { role: '新患①', staff: '片山' }, { role: '新患②', staff: '猪股' }, { role: '新患③', staff: '齋藤' },
+    { role: 'EGD①', staff: '吉野・瓜田宗' }, { role: 'EGD②', staff: '宮下' }, { role: 'EGD③', staff: '福士・竹本' },
+    { role: 'EUS', staff: '小岩井・伊藤・瓜田愛' },
+    { role: 'CS①', staff: '及川・八子・山田' }, { role: 'CS②', staff: '遠藤・田島' },
+    { role: '専攻医AUS', staff: '巽' }, { role: 'back up', staff: '木内' },
+    { role: '若林EGD', staff: '目黒・石川' }, { role: '仙台健診', staff: '廣田' },
+    { role: '一番町', staff: '早川' }, { role: '涌谷', staff: '大沼' }, { role: '若林午後CS', staff: '吉野・さやか' },
+  ],
+  // 火曜
+  [
+    { role: '休暇者', staff: '' },
+    { role: '新患①', staff: '金' }, { role: '新患②', staff: '早川' }, { role: '新患③', staff: '田島' }, { role: '新患④', staff: '八子' },
+    { role: 'EGD①', staff: '永井・木内' }, { role: 'EGD②', staff: '片山' }, { role: 'EGD③', staff: '猪股・瓜田愛' },
+    { role: 'EUS', staff: '廣田・及川・齋藤・巽' },
+    { role: 'CS①', staff: '吉野・瓜田宗' }, { role: 'CS②', staff: '宮下・竹本' },
+    { role: '専攻医AUS', staff: '山田' }, { role: 'back up', staff: 'なし' },
+    { role: '若林EGD', staff: '小暮・目黒・伊藤' }, { role: '刈田病院', staff: '佐々木' },
+    { role: '真壁病院', staff: '巽or齋藤or八子or山田' }, { role: '矢本内科', staff: '賢一' }, { role: '若林午後CS', staff: '近藤' },
+  ],
+  // 水曜
+  [
+    { role: '休暇者', staff: '' },
+    { role: '新患①', staff: '永井' }, { role: '新患②', staff: '宮下' }, { role: '新患③', staff: '瓜田愛' },
+    { role: 'EGD①', staff: '金・竹本' }, { role: 'EGD②', staff: '大沼' }, { role: 'EGD③', staff: '小岩井・木内' },
+    { role: 'EUS', staff: '猪股・山田・八子' },
+    { role: 'CS①', staff: '遠藤・齋藤・巽' }, { role: 'CS②', staff: '早川・瓜田宗' },
+    { role: '専攻医AUS', staff: 'なし' }, { role: 'back up', staff: '田島' },
+    { role: '若林EGD', staff: '廣田・木村・賢一' }, { role: '刈田病院', staff: '及川' }, { role: '健診プラザ', staff: '吉野' },
+    { role: '渡辺病院', staff: '高須' }, { role: '佐藤胃腸外科', staff: '目黒' }, { role: '若林午後CS', staff: '翔太郎' },
+    { role: 'ゆうファミリー', staff: '瓜田宗or瓜田愛or竹本or田島or木内' },
+  ],
+  // 木曜
+  [
+    { role: '休暇者', staff: '' },
+    { role: '新患①', staff: '伊藤' }, { role: '新患②', staff: '瓜田宗' }, { role: '新患③', staff: '竹本' },
+    { role: 'EGD①', staff: '及川・田島' }, { role: 'EGD②', staff: '福士' }, { role: 'EGD③', staff: '金・齋藤・巽' },
+    { role: 'EUS', staff: 'なし' },
+    { role: 'CS①', staff: '永井・木内' }, { role: 'CS②', staff: '山田(潤)・山田・八子' },
+    { role: '透視CS', staff: '吉野' }, { role: '午後CS', staff: '大沼・及川' },
+    { role: '専攻医AUS', staff: '2年目' }, { role: 'back up', staff: '大沼・瓜田愛' },
+    { role: '若林EGD', staff: '石川・内海・小岩井' }, { role: '健診プラザ', staff: '小暮' }, { role: '女川EGD&CS', staff: '片山' },
+    { role: '高砂内科', staff: '遠藤' }, { role: '若林午後CS', staff: '近藤・永井' }, { role: '循環器センター', staff: '早川' },
+  ],
+  // 金曜
+  [
+    { role: '休暇者', staff: '' },
+    { role: '新患①', staff: '大沼' }, { role: '新患②', staff: '及川' }, { role: '新患③', staff: '木内' },
+    { role: 'EGD①', staff: '早川・八子・山田' }, { role: 'EGD②', staff: '永井' }, { role: 'EGD③', staff: '金・竹本' },
+    { role: 'EUS', staff: '廣田・宮下・瓜田宗・齋藤・巽' },
+    { role: 'CS①', staff: '猪股・田島' }, { role: 'CS②', staff: 'なし' },
+    { role: '午後CS', staff: '早川・永井' },
+    { role: '専攻医AUS', staff: '2年目' }, { role: 'back up', staff: '小暮' },
+    { role: '葵会EGD', staff: '福士' }, { role: '若林EGD', staff: '高須・目黒・小岩井' },
+    { role: '刈田病院', staff: '伊藤' }, { role: '渡辺病院', staff: '遠藤' }, { role: '一番町', staff: '片山' },
+    { role: '米谷病院', staff: '巽or齋藤or八子or山田' }, { role: '若林午後CS', staff: '石川・さやか' }, { role: '循環器センター', staff: '猪股' },
+  ]
+];
+
+// 4週分のデータを生成
+const weeksData = [
+  { id: 'week1', label: '第1週', dates: ['2026-08-03', '2026-08-04', '2026-08-05', '2026-08-06', '2026-08-07'] },
+  { id: 'week2', label: '第2週', dates: ['2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13', '2026-08-14'] },
+  { id: 'week3', label: '第3週', dates: ['2026-08-17', '2026-08-18', '2026-08-19', '2026-08-20', '2026-08-21'] },
+  { id: 'week4', label: '第4週', dates: ['2026-08-24', '2026-08-25', '2026-08-26', '2026-08-27', '2026-08-28'] },
+];
+
+const dayNames = ['(月)', '(火)', '(水)', '(木)', '(金)'];
+
+const generateDefaultSchedules = () => {
+  const result = {};
+  weeksData.forEach((week) => {
+    week.dates.forEach((dateStr, index) => {
+      result[dateStr] = JSON.parse(JSON.stringify(weeklyPattern[index]));
+    });
+  });
+  return result;
+};
+
+const defaultSchedules = generateDefaultSchedules();
+
+// 役割に応じたバッジの色分け
+const getRoleColor = (role) => {
+  if (role === '休暇者') return 'bg-rose-100 text-rose-800 border-rose-300';
+  
+  const externals = ['若林', '女川', '涌谷', '一番町', '健診', '刈田', '真壁', '矢本', '渡辺', '佐藤', 'ゆう', '高砂', '循環器', '葵会', '米谷'];
+  if (externals.some(kw => role.includes(kw))) {
+    return 'bg-stone-100 text-stone-700 border-stone-300'; 
+  }
+
+  if (role.includes('新患')) return 'bg-emerald-50 text-emerald-800 border-emerald-200';
+  if (role.includes('EGD')) return 'bg-blue-50 text-blue-800 border-blue-200';
+  if (role.includes('EUS')) return 'bg-purple-50 text-purple-800 border-purple-200';
+  if (role.includes('CS')) return 'bg-orange-50 text-orange-800 border-orange-200';
+  if (role.includes('AUS')) return 'bg-pink-50 text-pink-800 border-pink-200';
+  if (role.includes('back up')) return 'bg-slate-700 text-white border-slate-800';
+  
+  return 'bg-white text-slate-700 border-slate-300';
+};
+
+// 重複チェック用のロジック
+const PM_BOOTHS = ['若林午後CS', '午後CS', 'ゆうファミリー', '循環器センター'];
+const getPeriod = (role) => PM_BOOTHS.includes(role) ? 'PM' : 'AM';
+
+const checkConflicts = (booths) => {
+  const staffMap = {}; 
+  
+  booths.forEach((booth, localIndex) => {
+    if (!booth.staff) return;
+    const names = booth.staff
+      .split(/[\s,、・]+|or/)
+      .map(n => n.trim())
+      .filter(n => n.length > 0 && n !== 'なし' && !n.includes('年目') && n !== 'back' && n !== 'up');
+      
+    const period = getPeriod(booth.role);
+    
+    names.forEach(name => {
+      if (!staffMap[name]) staffMap[name] = [];
+      staffMap[name].push({ role: booth.role, period, localIndex });
+    });
+  });
+
+  const conflicts = {}; 
+  
+  Object.keys(staffMap).forEach(name => {
+    const assignments = staffMap[name];
+    if (assignments.length > 1) {
+      const ams = assignments.filter(a => a.period === 'AM');
+      const pms = assignments.filter(a => a.period === 'PM');
+      
+      const registerConflicts = (group) => {
+        if (group.length > 1) {
+          group.forEach(a => {
+            if (!conflicts[a.localIndex]) conflicts[a.localIndex] = [];
+            const others = group.filter(other => other.localIndex !== a.localIndex).map(other => other.role);
+            if (!conflicts[a.localIndex].find(c => c.name === name)) {
+                conflicts[a.localIndex].push({ name, others });
+            }
+          });
+        }
+      };
+      
+      registerConflicts(ams);
+      registerConflicts(pms);
+    }
+  });
+  
+  return conflicts;
+};
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [schedules, setSchedules] = useState(defaultSchedules);
+  
+  const [selectedWeek, setSelectedWeek] = useState('week1');
+  const [selectedDate, setSelectedDate] = useState('2026-08-03');
+  
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  // 認証の初期化 (匿名ログイン)
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        await signInAnonymously(auth);
+      } catch (error) {
+        console.error("Auth error:", error);
+        setIsLoading(false);
+      }
+    };
+    initAuth();
+
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (!currentUser) setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // データの取得
+  useEffect(() => {
+    if (!user) return;
+
+    // あなたのFirestore上の保存場所 (例: 'artifacts/gastro-schedule/public/data/schedules')
+    const schedulesRef = collection(db, 'artifacts', 'gastro-schedule', 'public', 'data', COLLECTION_NAME);
+    
+    const unsubscribers = Object.keys(defaultSchedules).map(dateKey => {
+      const docRef = doc(schedulesRef, dateKey);
+      return onSnapshot(docRef, 
+        (snapshot) => {
+          if (snapshot.exists()) {
+            const data = snapshot.data();
+            const parsedStaffData = JSON.parse(data.staffData);
+            setSchedules(prev => ({
+              ...prev,
+              [dateKey]: parsedStaffData
+            }));
+          } else {
+            setSchedules(prev => ({
+              ...prev,
+              [dateKey]: defaultSchedules[dateKey]
+            }));
+          }
+          setIsLoading(false);
+        },
+        (error) => {
+          console.error(`Error fetching schedule for ${dateKey}:`, error);
+          setIsLoading(false);
+        }
+      );
+    });
+
+    return () => {
+      unsubscribers.forEach(unsub => unsub());
+    };
+  }, [user]);
+
+  const handleWeekChange = (weekId) => {
+    setSelectedWeek(weekId);
+    const firstDateOfWeek = weeksData.find(w => w.id === weekId).dates[0];
+    setSelectedDate(firstDateOfWeek);
+    setIsEditing(false);
+  };
+
+  const handleDateChange = (date) => {
+    setSelectedDate(date);
+    setIsEditing(false);
+  };
+
+  const handleEditStart = () => {
+    setEditData([...schedules[selectedDate]]);
+    setIsEditing(true);
+  };
+
+  const handleInputChange = (index, newValue) => {
+    const newData = [...editData];
+    newData[index] = { ...newData[index], staff: newValue };
+    setEditData(newData);
+  };
+
+  const handleSave = async () => {
+    if (!user) return;
+    setIsSaving(true);
+    try {
+      const schedulesRef = collection(db, 'artifacts', 'gastro-schedule', 'public', 'data', COLLECTION_NAME);
+      const docRef = doc(schedulesRef, selectedDate);
+      
+      await setDoc(docRef, {
+        staffData: JSON.stringify(editData),
+        updatedAt: new Date().toISOString(),
+        updatedBy: user.uid
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Error saving document: ", error);
+      alert("保存に失敗しました。Firebaseのルール設定などを確認してください。");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (password === 'admin123') {
+      setIsAdmin(true);
+      setShowLoginModal(false);
+      setPassword('');
+      setLoginError('');
+    } else {
+      setLoginError('パスワードが間違っています');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-4 text-slate-500">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <p className="text-sm font-medium">データを読み込んでいます...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const currentWeekData = weeksData.find(w => w.id === selectedWeek);
+  const activeData = isEditing ? editData : schedules[selectedDate];
+
+  const leavesData = activeData[0] || { staff: '' };
+  const boothsData = activeData.slice(1);
+  const defaultBoothsData = defaultSchedules[selectedDate].slice(1);
+
+  const leaveNames = leavesData.staff
+    .split(/[\s,、・]+|or/)
+    .map(name => name.trim())
+    .filter(name => name.length > 0);
+
+  const doubleBookingConflicts = checkConflicts(boothsData);
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
+      <header className="bg-blue-800 text-white p-3 sm:p-4 shadow-md sticky top-0 z-30">
+        <div className="max-w-4xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-blue-200" />
+            <h1 className="text-lg font-bold tracking-tight">業務変更表 <span className="text-xs font-normal opacity-80 ml-1">2026.08</span></h1>
+          </div>
+          {isAdmin ? (
+            <button 
+              onClick={() => { setIsAdmin(false); setIsEditing(false); }}
+              className="flex items-center gap-1.5 text-xs bg-blue-900 hover:bg-blue-700 px-3 py-1.5 rounded-md transition-colors border border-blue-700"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">ログアウト</span>
+            </button>
+          ) : (
+            <button 
+              onClick={() => setShowLoginModal(true)}
+              className="flex items-center gap-1.5 text-xs bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-md transition-colors shadow-sm border border-blue-500"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">管理者</span>
+            </button>
+          )}
+        </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto p-3 sm:p-4 pb-28">
+        
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 mb-4 sticky top-[60px] z-20">
+          <div className="flex overflow-x-auto gap-1 pb-1.5 mb-1.5 border-b border-slate-100 hide-scrollbar">
+            {weeksData.map((week) => (
+              <button
+                key={week.id}
+                onClick={() => handleWeekChange(week.id)}
+                className={`whitespace-nowrap px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
+                  selectedWeek === week.id 
+                    ? 'bg-blue-100 text-blue-800' 
+                    : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                {week.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex overflow-x-auto gap-1.5 hide-scrollbar">
+            {currentWeekData.dates.map((dateStr, index) => {
+              const [, month, day] = dateStr.split('-');
+              const isSelected = selectedDate === dateStr;
+              return (
+                <button
+                  key={dateStr}
+                  onClick={() => handleDateChange(dateStr)}
+                  className={`flex-1 min-w-[55px] flex flex-col items-center justify-center py-1.5 px-1 rounded-lg transition-all duration-200 border ${
+                    isSelected 
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200'
+                  }`}
+                >
+                  <span className={`text-[10px] ${isSelected ? 'opacity-90' : 'text-slate-400'}`}>{parseInt(month)}/{parseInt(day)}</span>
+                  <span className="text-sm font-bold">{dayNames[index]}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {isAdmin && !isEditing && (
+          <div className="bg-blue-50/50 rounded-lg border border-blue-200 p-3 mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div className="flex items-center gap-1.5 text-blue-800">
+              <ShieldAlert className="w-4 h-4" />
+              <span className="font-bold text-xs">管理者モード</span>
+            </div>
+            <button 
+              onClick={handleEditStart}
+              className="flex items-center justify-center gap-1.5 bg-white border border-blue-600 text-blue-700 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-md text-sm font-bold transition-colors w-full sm:w-auto shadow-sm"
+            >
+              <Edit className="w-3.5 h-3.5" />
+              出番を変更する
+            </button>
+          </div>
+        )}
+
+        {/* 休暇者枠 */}
+        <div className="bg-white rounded-lg shadow-sm border-2 border-rose-200 overflow-hidden mb-4">
+          <div className="bg-rose-50 border-b border-rose-200 px-4 py-2.5 flex items-center gap-2">
+            <span className="bg-rose-100 text-rose-800 text-xs px-2 py-1 rounded border border-rose-300 font-bold">休暇者</span>
+            <span className="text-xs text-rose-600 font-medium">※カンマやスペース区切りで入力</span>
+          </div>
+          <div className="p-3">
+            {isEditing ? (
+              <input
+                type="text"
+                placeholder="例: 片山, 遠藤"
+                value={leavesData.staff}
+                onChange={(e) => handleInputChange(0, e.target.value)}
+                className="w-full p-2 border-2 border-rose-300 rounded-md outline-none focus:border-rose-500 transition-all font-medium text-sm bg-rose-50/30"
+              />
+            ) : (
+              <div className="text-sm font-bold text-slate-800 min-h-[1.5rem] flex items-center">
+                {leavesData.staff || <span className="text-slate-400 font-normal">（なし）</span>}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 業務表メイン */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-300 overflow-hidden mb-8">
+          <div className="bg-slate-100 border-b-2 border-slate-300 px-4 py-3 flex justify-between items-center">
+            <h2 className="text-base font-black text-slate-700 flex items-center gap-1.5">
+              {parseInt(selectedDate.split('-')[1])}/{parseInt(selectedDate.split('-')[2])} 
+              {dayNames[currentWeekData.dates.indexOf(selectedDate)]}
+            </h2>
+            {isEditing && (
+              <span className="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse border border-amber-300 flex items-center gap-1">
+                <Edit className="w-3 h-3" /> 編集中
+              </span>
+            )}
+          </div>
+
+          <div className="divide-y-2 divide-slate-200">
+            {boothsData.map((item, localIndex) => {
+              const dataIndex = localIndex + 1;
+              const defaultStaff = defaultBoothsData[localIndex].staff;
+              const currentStaff = item.staff;
+              const changed = defaultStaff !== currentStaff;
+              
+              const conflictNames = leaveNames.filter(name => currentStaff.includes(name));
+              const hasLeaveConflict = conflictNames.length > 0;
+              const doubleBookings = doubleBookingConflicts[localIndex];
+              const hasDoubleBooking = doubleBookings && doubleBookings.length > 0;
+              const isError = hasLeaveConflict || hasDoubleBooking;
+              
+              return (
+                <div 
+                  key={dataIndex} 
+                  className={`flex flex-col sm:flex-row items-stretch transition-colors ${
+                    isError ? 'bg-red-50' : changed && !isEditing ? 'bg-amber-50/40' : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <div className={`sm:w-1/3 p-2 sm:p-3 sm:border-r-2 border-slate-200 flex items-center shrink-0 ${isError ? 'bg-red-100/50' : 'bg-slate-50/50'}`}>
+                    <span className={`inline-block px-2 py-1 rounded text-xs font-bold border w-full sm:w-auto text-center sm:text-left ${getRoleColor(item.role)}`}>
+                      {item.role}
+                    </span>
+                  </div>
+                  
+                  <div className="sm:w-2/3 p-2 sm:p-3 flex flex-col justify-center min-h-[3rem]">
+                    {isEditing ? (
+                      <div className="w-full">
+                        {changed && (
+                          <div className="text-[10px] text-slate-400 mb-0.5 flex items-center gap-1">
+                            基本: {defaultStaff} <span className="text-amber-500 font-bold">(変更あり)</span>
+                          </div>
+                        )}
+                        <input
+                          type="text"
+                          value={currentStaff}
+                          onChange={(e) => handleInputChange(dataIndex, e.target.value)}
+                          className={`w-full p-2 border-2 rounded-md outline-none focus:border-blue-500 transition-all font-medium text-sm ${
+                            isError ? 'border-red-400 bg-red-50 text-red-900' : changed ? 'border-amber-300 bg-amber-50' : 'border-slate-300 bg-white'
+                          }`}
+                        />
+                        
+                        {hasLeaveConflict && (
+                          <div className="text-red-600 text-[10px] font-bold mt-1 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" /> 休暇者 ({conflictNames.join(', ')}) が含まれています
+                          </div>
+                        )}
+                        {hasDoubleBooking && doubleBookings.map((db, i) => (
+                          <div key={i} className="text-red-600 text-[10px] font-bold mt-1 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" /> 重複: {db.name} (他: {db.others.join(', ')})
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex flex-col">
+                          {changed ? (
+                            <>
+                              <div className="flex items-center gap-1 text-slate-400 text-[10px] font-medium mb-0.5">
+                                <span className="line-through decoration-slate-400">{defaultStaff}</span>
+                                <ArrowRight className="w-2.5 h-2.5" />
+                              </div>
+                              <span className={`text-base sm:text-lg font-black drop-shadow-sm ${isError ? 'text-red-700' : 'text-red-600'}`}>
+                                {currentStaff}
+                              </span>
+                            </>
+                          ) : (
+                            <span className={`text-sm font-bold ${isError ? 'text-red-700' : 'text-slate-800'}`}>
+                              {currentStaff}
+                            </span>
+                          )}
+                          
+                          {hasLeaveConflict && (
+                            <div className="text-red-600 text-[10px] font-bold mt-0.5 flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3" /> 休暇者 ({conflictNames.join(', ')}) が含まれています
+                            </div>
+                          )}
+                          {hasDoubleBooking && doubleBookings.map((db, i) => (
+                            <div key={i} className="text-red-600 text-[10px] font-bold mt-0.5 flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3" /> 重複: {db.name} (他: {db.others.join(', ')})
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <div className="flex gap-1 shrink-0 ml-2">
+                          {isError && (
+                            <span className="inline-flex items-center gap-1 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded font-bold shadow-sm">
+                              <AlertTriangle className="w-3 h-3" />
+                              <span className="hidden sm:inline">アラート</span>
+                            </span>
+                          )}
+                          {changed && !isError && (
+                            <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded font-bold border border-amber-300">
+                              <AlertCircle className="w-3 h-3" />
+                              <span className="hidden sm:inline">変更あり</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {isEditing && (
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-300 p-3 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] z-40">
+            <div className="max-w-4xl mx-auto flex justify-end gap-2">
+              <button
+                onClick={() => setIsEditing(false)}
+                disabled={isSaving}
+                className="px-4 py-2 rounded-md text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors disabled:opacity-50 border border-slate-300"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="flex items-center gap-1.5 px-6 py-2 rounded-md text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors disabled:opacity-50"
+              >
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {isSaving ? '保存中...' : '変更を保存'}
+              </button>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-slate-50">
+              <h3 className="font-bold text-sm flex items-center gap-1.5 text-slate-800">
+                <Lock className="w-4 h-4 text-blue-600" />
+                管理者ログイン
+              </h3>
+              <button 
+                onClick={() => { setShowLoginModal(false); setLoginError(''); setPassword(''); }}
+                className="p-1 hover:bg-slate-200 rounded text-slate-500 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleLogin} className="p-5">
+              <p className="text-xs text-slate-600 mb-4 leading-relaxed">
+                出番を変更するにはパスワードを入力してください。<br/>
+                <span className="inline-block mt-1.5 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded font-bold border border-blue-200">
+                  パスワード: admin123
+                </span>
+              </p>
+              
+              <div className="mb-5">
+                <input
+                  type="password"
+                  placeholder="パスワード"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full p-2.5 border-2 border-slate-300 rounded-md outline-none focus:border-blue-500 transition-all text-sm font-medium"
+                  autoFocus
+                />
+                {loginError && (
+                  <p className="text-red-600 text-xs mt-1.5 flex items-center gap-1 font-bold">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {loginError}
+                  </p>
+                )}
+              </div>
+              
+              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-md shadow-sm transition-colors text-sm">
+                ログイン
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <style dangerouslySetInnerHTML={{__html: `
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
+    </div>
+  );
+}
+
+
