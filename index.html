@@ -242,7 +242,7 @@
       const staffMap = {}; 
       booths.forEach((booth, localIndex) => {
         if (!booth.staff || booth.role === '上部EUS') return; 
-        const names = booth.staff.split(/[\s,、・]+|or/).map(n => n.trim()).filter(n => {
+        const names = booth.staff.split(/[\s,、・]+|or/).map(n => n.replace(/[（\(].*?[）\)]/g, '').trim()).filter(n => {
           if (n.length === 0) return false;
           if (n === 'なし') return false;
           if (n.includes('年目')) return false;
@@ -586,7 +586,7 @@
       const boothsData = activeData.slice(1);
       const defaultBoothsData = defaultSchedules[selectedDate].slice(1);
 
-      const leaveNames = leavesData.staff.split(/[\s,、・]+|or/).map(name => name.trim()).filter(name => name.length > 0);
+      const leaveNames = leavesData.staff.split(/[\s,、・]+|or/).map(name => name.replace(/[（\(].*?[）\)]/g, '').trim()).filter(name => name.length > 0);
       const doubleBookingConflicts = checkConflicts(boothsData);
 
       const currentMetadata = schedulesMetadata[selectedDate];
@@ -1047,4 +1047,3 @@
   </script>
 </body>
 </html>
-
