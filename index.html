@@ -7,8 +7,11 @@
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- React & Babel (入力の安定性を保つためのシステム) -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
 
   <style>
     .hide-scrollbar::-webkit-scrollbar { display: none; }
@@ -16,38 +19,47 @@
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
+  
+  <div id="root"></div>
 
-  <div id="app"></div>
-
+  <!-- Firebase の読み込み -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    
+    // React側にFirebaseの機能を渡す
+    window.FirebaseLib = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, collection, doc, setDoc, onSnapshot };
+    window.dispatchEvent(new Event('firebase-loaded'));
+  </script>
 
-    // ============================================================================
-    // Firebase 初期化
-    // ============================================================================
-    const firebaseConfig = {
-      apiKey: "AIzaSyBhzyEtJ61cm4IP-sPru28xke-a1AoxvII",
-      authDomain: "gastro-schedule.firebaseapp.com",
-      projectId: "gastro-schedule",
-      storageBucket: "gastro-schedule.firebasestorage.app",
-      messagingSenderId: "546097500183",
-      appId: "1:546097500183:web:d760c76fa15bbcf9fb8c52"
+  <!-- アプリケーション本体 -->
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    
+    // アイコン一覧 (安定動作のためにインラインSVGで定義)
+    const Icon = {
+      Calendar: (p) => <svg className={p.className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
+      Clock: (p) => <svg className={p.className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+      LogOut: (p) => <svg className={p.className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>,
+      Lock: (p) => <svg className={p.className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+      ShieldAlert: (p) => <svg className={p.className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>,
+      Edit: (p) => <svg className={p.className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+      Download: (p) => <svg className={p.className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
+      Plus: (p) => <svg className={p.className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
+      X: (p) => <svg className={p.className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+      AlertCircle: (p) => <svg className={p.className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>,
+      AlertTriangle: (p) => <svg className={p.className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>,
+      Loader2: (p) => <svg className={p.className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>,
+      Save: (p) => <svg className={p.className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+      ArrowRight: (p) => <svg className={p.className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
     };
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    // データ構造が新しくなるためバージョンを更新
-    const COLLECTION_NAME = 'schedules_v6';
-
     // ============================================================================
-    // データ定義 (2026年8月〜10月の平日)
+    // データ定義
     // ============================================================================
     const weeklyPattern = [
-      // 月曜 (0)
-      [
+      [ // 月曜 (0)
         { role: '休暇者', staff: '' },
         { role: '新患①', staff: '片山' }, { role: '新患②', staff: '猪股' }, { role: '新患③', staff: '齋藤' },
         { role: 'EGD①', staff: '吉野・瓜田宗' }, { role: 'EGD②', staff: '宮下' }, { role: 'EGD③', staff: '福士・竹本' },
@@ -57,8 +69,7 @@
         { role: '若林EGD', staff: '目黒・石川' }, { role: '仙台健診', staff: '廣田' },
         { role: '一番町', staff: '早川' }, { role: '涌谷', staff: '大沼' }, { role: '若林午後CS', staff: '吉野・さやか' },
       ],
-      // 火曜 (1)
-      [
+      [ // 火曜 (1)
         { role: '休暇者', staff: '' },
         { role: '新患①', staff: '金' }, { role: '新患②', staff: '早川' }, { role: '新患③', staff: '田島' }, { role: '新患④', staff: '八子' },
         { role: 'EGD①', staff: '永井・木内' }, { role: 'EGD②', staff: '片山' }, { role: 'EGD③', staff: '猪股・瓜田愛' },
@@ -68,8 +79,7 @@
         { role: '若林EGD', staff: '小暮・目黒・伊藤' }, { role: '刈田病院', staff: '佐々木' },
         { role: '真壁病院', staff: '巽or齋藤or八子or山田' }, { role: '矢本内科', staff: '賢一' }, { role: '若林午後CS', staff: '近藤' },
       ],
-      // 水曜 (2)
-      [
+      [ // 水曜 (2)
         { role: '休暇者', staff: '' },
         { role: '新患①', staff: '永井' }, { role: '新患②', staff: '宮下' }, { role: '新患③', staff: '瓜田愛' },
         { role: 'EGD①', staff: '金・竹本' }, { role: 'EGD②', staff: '大沼' }, { role: 'EGD③', staff: '小岩井・木内' },
@@ -80,8 +90,7 @@
         { role: '渡辺病院', staff: '高須' }, { role: '佐藤胃腸外科', staff: '目黒' }, { role: '若林午後CS', staff: '翔太郎' },
         { role: 'ゆうファミリー', staff: '瓜田宗or瓜田愛or竹本or田島or木内' },
       ],
-      // 木曜 (3)
-      [
+      [ // 木曜 (3)
         { role: '休暇者', staff: '' },
         { role: '新患①', staff: '伊藤' }, { role: '新患②', staff: '瓜田宗' }, { role: '新患③', staff: '竹本' },
         { role: 'EGD①', staff: '及川・田島' }, { role: 'EGD②', staff: '福士' }, { role: 'EGD③', staff: '金・齋藤・巽' },
@@ -92,8 +101,7 @@
         { role: '若林EGD', staff: '石川・内海・小岩井' }, { role: '健診プラザ', staff: '小暮' }, { role: '女川EGD&CS', staff: '片山' },
         { role: '高砂内科', staff: '遠藤' }, { role: '若林午後CS', staff: '近藤・永井' }, { role: '循環器センター', staff: '早川' },
       ],
-      // 金曜 (4)
-      [
+      [ // 金曜 (4)
         { role: '休暇者', staff: '' },
         { role: '新患①', staff: '大沼' }, { role: '新患②', staff: '及川' }, { role: '新患③', staff: '木内' },
         { role: 'EGD①', staff: '早川・八子・山田' }, { role: 'EGD②', staff: '永井' }, { role: 'EGD③', staff: '金・竹本' },
@@ -107,32 +115,29 @@
       ]
     ];
 
-    // 2026年 8月〜10月の平日（祝日除外）
     const weeksData = [
       { id: '2026-08-W1', month: '2026-08', label: '第1週', dates: ['2026-08-03','2026-08-04','2026-08-05','2026-08-06','2026-08-07'] },
-      { id: '2026-08-W2', month: '2026-08', label: '第2週', dates: ['2026-08-10','2026-08-12','2026-08-13','2026-08-14'] }, // 8/11山の日
+      { id: '2026-08-W2', month: '2026-08', label: '第2週', dates: ['2026-08-10','2026-08-12','2026-08-13','2026-08-14'] },
       { id: '2026-08-W3', month: '2026-08', label: '第3週', dates: ['2026-08-17','2026-08-18','2026-08-19','2026-08-20','2026-08-21'] },
       { id: '2026-08-W4', month: '2026-08', label: '第4週', dates: ['2026-08-24','2026-08-25','2026-08-26','2026-08-27','2026-08-28'] },
       { id: '2026-09-W1', month: '2026-09', label: '第1週', dates: ['2026-08-31','2026-09-01','2026-09-02','2026-09-03','2026-09-04'] },
       { id: '2026-09-W2', month: '2026-09', label: '第2週', dates: ['2026-09-07','2026-09-08','2026-09-09','2026-09-10','2026-09-11'] },
       { id: '2026-09-W3', month: '2026-09', label: '第3週', dates: ['2026-09-14','2026-09-15','2026-09-16','2026-09-17','2026-09-18'] },
-      { id: '2026-09-W4', month: '2026-09', label: '第4週', dates: ['2026-09-24','2026-09-25'] }, // 9/21-23は祝日等
+      { id: '2026-09-W4', month: '2026-09', label: '第4週', dates: ['2026-09-24','2026-09-25'] },
       { id: '2026-10-W1', month: '2026-10', label: '第1週', dates: ['2026-09-28','2026-09-29','2026-09-30','2026-10-01','2026-10-02'] },
       { id: '2026-10-W2', month: '2026-10', label: '第2週', dates: ['2026-10-05','2026-10-06','2026-10-07','2026-10-08','2026-10-09'] },
-      { id: '2026-10-W3', month: '2026-10', label: '第3週', dates: ['2026-10-13','2026-10-14','2026-10-15','2026-10-16'] }, // 10/12スポーツの日
+      { id: '2026-10-W3', month: '2026-10', label: '第3週', dates: ['2026-10-13','2026-10-14','2026-10-15','2026-10-16'] },
       { id: '2026-10-W4', month: '2026-10', label: '第4週', dates: ['2026-10-19','2026-10-20','2026-10-21','2026-10-22','2026-10-23'] },
       { id: '2026-10-W5', month: '2026-10', label: '第5週', dates: ['2026-10-26','2026-10-27','2026-10-28','2026-10-29','2026-10-30'] }
     ];
-    
     const dayNames = ['(日)', '(月)', '(火)', '(水)', '(木)', '(金)', '(土)'];
 
-    // デフォルトデータの動的割り当て
     const generateDefaultSchedules = () => {
       const result = {};
       weeksData.forEach((week) => {
         week.dates.forEach((dateStr) => {
           const d = new Date(dateStr);
-          const dayIndex = d.getDay() - 1; // 月=0, 火=1...
+          const dayIndex = d.getDay() - 1;
           if(dayIndex >= 0 && dayIndex <= 4) {
             result[dateStr] = JSON.parse(JSON.stringify(weeklyPattern[dayIndex]));
           }
@@ -143,31 +148,7 @@
     const defaultSchedules = generateDefaultSchedules();
 
     // ============================================================================
-    // 状態管理 (State)
-    // ============================================================================
-    const state = {
-      user: null,
-      schedules: JSON.parse(JSON.stringify(defaultSchedules)),
-      updatedAts: {}, // 各日の最終更新日時を保持
-      selectedMonth: '2026-08',
-      selectedWeek: '2026-08-W1',
-      selectedDate: '2026-08-03',
-      isAdmin: false,
-      isEditing: false,
-      editData: [],
-      isLoading: true,
-      isSaving: false,
-      showLoginModal: false,
-      loginError: '',
-      passwordInput: ''
-    };
-
-    let activeInputId = null;
-    let activeSelectionStart = 0;
-    let activeSelectionEnd = 0;
-
-    // ============================================================================
-    // ユーティリティ関数
+    // ユーティリティ
     // ============================================================================
     const getRoleColor = (role) => {
       if (role === '休暇者') return 'bg-rose-100 text-rose-800 border-rose-300';
@@ -179,7 +160,7 @@
       if (role.includes('CS')) return 'bg-orange-50 text-orange-800 border-orange-200';
       if (role.includes('AUS')) return 'bg-pink-50 text-pink-800 border-pink-200';
       if (role.includes('back up')) return 'bg-slate-700 text-white border-slate-800';
-      return 'bg-white text-slate-700 border-slate-300'; // 臨時枠などは白
+      return 'bg-white text-slate-700 border-slate-300';
     };
 
     const PM_BOOTHS = ['若林午後CS', '午後CS', 'ゆうファミリー', '循環器センター'];
@@ -222,12 +203,6 @@
       return conflicts;
     };
 
-    const escapeHTML = (str) => {
-      return String(str).replace(/[&<>"']/g, function(match) {
-        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[match];
-      });
-    };
-
     const formatDateTime = (isoString) => {
       if (!isoString) return '';
       const d = new Date(isoString);
@@ -235,129 +210,162 @@
     };
 
     // ============================================================================
-    // UI アクション
+    // React アプリ本体
     // ============================================================================
-    window.appUI = {
-      handleMonthChange: (monthId) => {
-        state.selectedMonth = monthId;
-        const firstWeek = weeksData.find(w => w.month === monthId);
-        state.selectedWeek = firstWeek.id;
-        state.selectedDate = firstWeek.dates[0];
-        state.isEditing = false;
-        render();
-      },
-      handleWeekChange: (weekId) => {
-        state.selectedWeek = weekId;
-        state.selectedDate = weeksData.find(w => w.id === weekId).dates[0];
-        state.isEditing = false;
-        render();
-      },
-      handleDateChange: (date) => {
-        state.selectedDate = date;
-        state.isEditing = false;
-        render();
-      },
-      handleEditStart: () => {
-        state.editData = JSON.parse(JSON.stringify(state.schedules[state.selectedDate]));
-        state.isEditing = true;
-        render();
-      },
-      handleInputChange: (index, value) => {
-        state.editData[index].staff = value;
-        saveFocus();
-        render();
-      },
-      handleCustomRoleChange: (index, value) => {
-        state.editData[index].role = value;
-        saveFocus();
-        render();
-      },
-      addCustomBooth: () => {
-        // 新規の臨時枠を追加
-        state.editData.push({ role: '臨時枠', staff: '', isCustom: true });
-        render();
-      },
-      removeCustomBooth: (index) => {
-        state.editData.splice(index, 1);
-        render();
-      },
-      handleCancel: () => {
-        state.isEditing = false;
-        render();
-      },
-      handleSave: async () => {
-        if (!state.user) return;
-        state.isSaving = true;
-        render();
-        try {
-          const schedulesRef = collection(db, 'artifacts', 'gastro-schedule', 'public', 'data', COLLECTION_NAME);
-          const docRef = doc(schedulesRef, state.selectedDate);
-          
-          await setDoc(docRef, {
-            staffData: JSON.stringify(state.editData),
-            updatedAt: new Date().toISOString(),
-            updatedBy: state.user.uid
-          });
-          state.isEditing = false;
-        } catch (error) {
-          console.error("Error saving document: ", error);
-          alert("保存に失敗しました。Firebaseの設定や権限を確認してください。");
-        } finally {
-          state.isSaving = false;
-          render();
-        }
-      },
-      openLoginModal: () => {
-        state.showLoginModal = true;
-        state.loginError = '';
-        state.passwordInput = '';
-        render();
-      },
-      closeLoginModal: () => {
-        state.showLoginModal = false;
-        render();
-      },
-      handlePasswordChange: (val) => {
-        state.passwordInput = val;
-      },
-      handleLogin: (e) => {
-        e.preventDefault();
-        if (state.passwordInput === 'admin123') {
-          state.isAdmin = true;
-          state.showLoginModal = false;
-          state.passwordInput = '';
-          state.loginError = '';
-        } else {
-          state.loginError = 'パスワードが間違っています';
-        }
-        render();
-      },
-      handleLogout: () => {
-        state.isAdmin = false;
-        state.isEditing = false;
-        render();
-      },
-      downloadCSV: () => {
-        // Excel(CSV)出力機能
-        const weekData = weeksData.find(w => w.id === state.selectedWeek);
+    function App() {
+      const [user, setUser] = useState(null);
+      const [schedules, setSchedules] = useState(defaultSchedules);
+      const [updatedAts, setUpdatedAts] = useState({});
+      
+      const [selectedMonth, setSelectedMonth] = useState('2026-08');
+      const [selectedWeek, setSelectedWeek] = useState('2026-08-W1');
+      const [selectedDate, setSelectedDate] = useState('2026-08-03');
+      
+      const [isAdmin, setIsAdmin] = useState(false);
+      const [isEditing, setIsEditing] = useState(false);
+      const [editData, setEditData] = useState([]);
+      const [isLoading, setIsLoading] = useState(true);
+      const [isSaving, setIsSaving] = useState(false);
+      
+      const [showLoginModal, setShowLoginModal] = useState(false);
+      const [password, setPassword] = useState('');
+      const [loginError, setLoginError] = useState('');
+
+      useEffect(() => {
+        const { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, collection, doc, onSnapshot } = window.FirebaseLib;
         
-        // Excelで文字化けしないようにBOMを付与
-        let csvContent = "\uFEFF日付,曜日,役割,担当者\n";
+        const firebaseConfig = {
+          apiKey: "AIzaSyBhzyEtJ61cm4IP-sPru28xke-a1AoxvII",
+          authDomain: "gastro-schedule.firebaseapp.com",
+          projectId: "gastro-schedule",
+          storageBucket: "gastro-schedule.firebasestorage.app",
+          messagingSenderId: "546097500183",
+          appId: "1:546097500183:web:d760c76fa15bbcf9fb8c52"
+        };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        signInAnonymously(auth).catch(err => {
+          console.error(err);
+          setIsLoading(false);
+        });
+
+        const unsubAuth = onAuthStateChanged(auth, (currentUser) => {
+          setUser(currentUser);
+          if (currentUser) {
+            const schedulesRef = collection(db, 'artifacts', 'gastro-schedule', 'public', 'data', 'schedules_v6');
+            
+            Object.keys(defaultSchedules).forEach(dateKey => {
+              onSnapshot(doc(schedulesRef, dateKey), (snapshot) => {
+                if (snapshot.exists()) {
+                  const data = snapshot.data();
+                  setSchedules(prev => ({ ...prev, [dateKey]: JSON.parse(data.staffData) }));
+                  setUpdatedAts(prev => ({ ...prev, [dateKey]: data.updatedAt }));
+                }
+                setIsLoading(false);
+              });
+            });
+          } else {
+            setIsLoading(false);
+          }
+        });
+        return () => unsubAuth();
+      }, []);
+
+      const handleMonthChange = (e) => {
+        const monthId = e.target.value;
+        setSelectedMonth(monthId);
+        const firstWeek = weeksData.find(w => w.month === monthId);
+        setSelectedWeek(firstWeek.id);
+        setSelectedDate(firstWeek.dates[0]);
+        setIsEditing(false);
+      };
+
+      const handleWeekChange = (weekId) => {
+        setSelectedWeek(weekId);
+        setSelectedDate(weeksData.find(w => w.id === weekId).dates[0]);
+        setIsEditing(false);
+      };
+
+      const handleDateChange = (date) => {
+        setSelectedDate(date);
+        setIsEditing(false);
+      };
+
+      const handleEditStart = () => {
+        setEditData(JSON.parse(JSON.stringify(schedules[selectedDate])));
+        setIsEditing(true);
+      };
+
+      const handleInputChange = (index, value) => {
+        const newData = [...editData];
+        newData[index].staff = value;
+        setEditData(newData);
+      };
+
+      const handleCustomRoleChange = (index, value) => {
+        const newData = [...editData];
+        newData[index].role = value;
+        setEditData(newData);
+      };
+
+      const addCustomBooth = () => {
+        setEditData([...editData, { role: '臨時枠', staff: '', isCustom: true }]);
+      };
+
+      const removeCustomBooth = (index) => {
+        const newData = [...editData];
+        newData.splice(index, 1);
+        setEditData(newData);
+      };
+
+      const handleSave = async () => {
+        if (!user) return;
+        setIsSaving(true);
+        try {
+          const { getFirestore, doc, setDoc } = window.FirebaseLib;
+          const db = getFirestore();
+          await setDoc(doc(db, 'artifacts', 'gastro-schedule', 'public', 'data', 'schedules_v6', selectedDate), {
+            staffData: JSON.stringify(editData),
+            updatedAt: new Date().toISOString(),
+            updatedBy: user.uid
+          });
+          setIsEditing(false);
+        } catch (error) {
+          alert("保存に失敗しました。");
+        } finally {
+          setIsSaving(false);
+        }
+      };
+
+      const handleLogin = (e) => {
+        e.preventDefault();
+        if (password === 'admin123') {
+          setIsAdmin(true);
+          setShowLoginModal(false);
+          setPassword('');
+          setLoginError('');
+        } else {
+          setLoginError('パスワードが間違っています');
+        }
+      };
+
+      const downloadCSV = () => {
+        const weekData = weeksData.find(w => w.id === selectedWeek);
+        let csvContent = "\uFEFF日付,曜日,役割,担当者\n"; // BOM付与(文字化け防止)
         
         weekData.dates.forEach(dateStr => {
           const d = new Date(dateStr);
-          const dayStr = dayNames[d.getDay()].replace(/[()]/g, ''); // 曜日文字だけ抽出
-          
-          const dataToExport = state.schedules[dateStr];
+          const dayStr = dayNames[d.getDay()].replace(/[()]/g, '');
+          const dataToExport = schedules[dateStr];
           dataToExport.forEach(item => {
-            // カンマが含まれているとCSVが崩れるので全角に置換するかダブルクォーテーションで囲む
             const role = item.role.replace(/"/g, '""');
             const staff = item.staff.replace(/"/g, '""');
             csvContent += `${dateStr},${dayStr},"${role}","${staff}"\n`;
           });
         });
 
-        // ダウンロード処理
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -366,427 +374,264 @@
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-      }
-    };
+      };
 
-    function saveFocus() {
-      const activeElem = document.activeElement;
-      if(activeElem && activeElem.tagName === 'INPUT') {
-          activeInputId = activeElem.id;
-          activeSelectionStart = activeElem.selectionStart;
-          activeSelectionEnd = activeElem.selectionEnd;
-      } else {
-          activeInputId = null;
-      }
-    }
-
-    // ============================================================================
-    // 描画関数 (HTML構築)
-    // ============================================================================
-    function render() {
-      const appDiv = document.getElementById('app');
-      
-      if (state.isLoading) {
-        appDiv.innerHTML = `
-          <div class="min-h-screen flex items-center justify-center bg-slate-50">
-            <div class="flex flex-col items-center gap-4 text-slate-500">
-              <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-blue-600"></i>
-              <p class="text-sm font-medium">データを読み込んでいます...</p>
+      if (isLoading) {
+        return (
+          <div className="min-h-screen flex items-center justify-center bg-slate-50">
+            <div className="flex flex-col items-center gap-4 text-slate-500">
+              <Icon.Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+              <p className="text-sm font-medium">データを読み込んでいます...</p>
             </div>
           </div>
-        `;
-        lucide.createIcons();
-        return;
+        );
       }
 
-      const currentMonthWeeks = weeksData.filter(w => w.month === state.selectedMonth);
-      const currentWeekData = weeksData.find(w => w.id === state.selectedWeek);
-      const activeData = state.isEditing ? state.editData : state.schedules[state.selectedDate];
+      const currentMonthWeeks = weeksData.filter(w => w.month === selectedMonth);
+      const currentWeekData = weeksData.find(w => w.id === selectedWeek);
+      const activeData = isEditing ? editData : schedules[selectedDate];
       
       const leavesData = activeData[0] || { staff: '' };
       const boothsData = activeData.slice(1);
-      const defaultBoothsData = defaultSchedules[state.selectedDate].slice(1);
+      const defaultBoothsData = defaultSchedules[selectedDate].slice(1);
 
-      const leaveNames = leavesData.staff
-        .split(/[\s,、・]+|or/)
-        .map(name => name.trim())
-        .filter(name => name.length > 0);
-
+      const leaveNames = leavesData.staff.split(/[\s,、・]+|or/).map(n => n.trim()).filter(n => n.length > 0);
       const doubleBookingConflicts = checkConflicts(boothsData);
-      
-      const lastUpdatedStr = formatDateTime(state.updatedAts[state.selectedDate]);
+      const lastUpdatedStr = formatDateTime(updatedAts[selectedDate]);
 
-      // --- HTML構築開始 ---
-      let html = `
-        <header class="bg-blue-800 text-white p-3 sm:p-4 shadow-md sticky top-0 z-30">
-          <div class="max-w-4xl mx-auto flex justify-between items-start sm:items-center flex-col sm:flex-row gap-3">
-            <div class="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
-              <div class="flex items-center gap-2">
-                <i data-lucide="calendar" class="w-5 h-5 text-blue-200"></i>
-                <h1 class="text-lg font-bold tracking-tight">業務変更表</h1>
-              </div>
-              ${lastUpdatedStr ? `
-                <span class="text-xs text-blue-200/90 font-medium">
-                  <i data-lucide="clock" class="inline w-3 h-3 mb-0.5"></i> 最終更新: ${lastUpdatedStr}
-                </span>
-              ` : ''}
-            </div>
-            
-            <div class="flex items-center gap-2 self-end sm:self-auto">
-              ${state.isAdmin ? `
-                <button onclick="window.appUI.handleLogout()" class="flex items-center gap-1.5 text-xs bg-blue-900 hover:bg-blue-700 px-3 py-1.5 rounded-md transition-colors border border-blue-700">
-                  <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
-                  <span class="hidden sm:inline">ログアウト</span>
-                </button>
-              ` : `
-                <button onclick="window.appUI.openLoginModal()" class="flex items-center gap-1.5 text-xs bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-md transition-colors shadow-sm border border-blue-500">
-                  <i data-lucide="lock" class="w-3.5 h-3.5"></i>
-                  <span class="hidden sm:inline">管理者</span>
-                </button>
-              `}
-            </div>
-          </div>
-        </header>
-
-        <main class="max-w-4xl mx-auto p-3 sm:p-4 pb-28">
-          
-          <!-- 月・週・日 ナビゲーション -->
-          <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-2 mb-4 sticky top-[72px] z-20">
-            
-            <!-- 上段：月切り替え ＆ Excelボタン -->
-            <div class="flex justify-between items-center mb-2 pb-2 border-b border-slate-100">
-              <select onchange="window.appUI.handleMonthChange(this.value)" class="p-1.5 rounded-md border-2 border-blue-200 text-sm font-bold bg-blue-50 text-blue-800 outline-none focus:border-blue-500">
-                <option value="2026-08" ${state.selectedMonth === '2026-08' ? 'selected' : ''}>2026年 8月</option>
-                <option value="2026-09" ${state.selectedMonth === '2026-09' ? 'selected' : ''}>2026年 9月</option>
-                <option value="2026-10" ${state.selectedMonth === '2026-10' ? 'selected' : ''}>2026年 10月</option>
-              </select>
-              
-              <button onclick="window.appUI.downloadCSV()" class="flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-md text-xs font-bold hover:bg-emerald-700 transition-colors shadow-sm">
-                <i data-lucide="download" class="w-3.5 h-3.5"></i> 
-                <span class="hidden sm:inline">Excel(CSV)出力</span>
-                <span class="sm:hidden">出力</span>
-              </button>
-            </div>
-
-            <!-- 中段：週切り替え -->
-            <div class="flex overflow-x-auto gap-1 pb-1.5 mb-1.5 border-b border-slate-100 hide-scrollbar">
-              ${currentMonthWeeks.map(week => `
-                <button onclick="window.appUI.handleWeekChange('${week.id}')" 
-                  class="whitespace-nowrap px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${state.selectedWeek === week.id ? 'bg-blue-100 text-blue-800' : 'text-slate-500 hover:bg-slate-100'}">
-                  ${week.label}
-                </button>
-              `).join('')}
-            </div>
-
-            <!-- 下段：日切り替え -->
-            <div class="flex overflow-x-auto gap-1.5 hide-scrollbar">
-              ${currentWeekData.dates.map(dateStr => {
-                const d = new Date(dateStr);
-                const isSelected = state.selectedDate === dateStr;
-                return `
-                  <button onclick="window.appUI.handleDateChange('${dateStr}')" 
-                    class="flex-1 min-w-[55px] flex flex-col items-center justify-center py-1.5 px-1 rounded-lg transition-all duration-200 border ${isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200'}">
-                    <span class="text-[10px] ${isSelected ? 'opacity-90' : 'text-slate-400'}">${d.getMonth()+1}/${d.getDate()}</span>
-                    <span class="text-sm font-bold">${dayNames[d.getDay()]}</span>
-                  </button>
-                `;
-              }).join('')}
-            </div>
-          </div>
-
-          <!-- コントロールパネル -->
-          ${(state.isAdmin && !state.isEditing) ? `
-            <div class="bg-blue-50/50 rounded-lg border border-blue-200 p-3 mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <div class="flex items-center gap-1.5 text-blue-800">
-                <i data-lucide="shield-alert" class="w-4 h-4"></i>
-                <span class="font-bold text-xs">管理者モード</span>
-              </div>
-              <button onclick="window.appUI.handleEditStart()" class="flex items-center justify-center gap-1.5 bg-white border border-blue-600 text-blue-700 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-md text-sm font-bold transition-colors w-full sm:w-auto shadow-sm">
-                <i data-lucide="edit" class="w-3.5 h-3.5"></i>
-                出番を変更・追加する
-              </button>
-            </div>
-          ` : ''}
-
-          <!-- 休暇者枠 -->
-          <div class="bg-white rounded-lg shadow-sm border-2 border-rose-200 overflow-hidden mb-4">
-            <div class="bg-rose-50 border-b border-rose-200 px-4 py-2.5 flex items-center gap-2">
-              <span class="bg-rose-100 text-rose-800 text-xs px-2 py-1 rounded border border-rose-300 font-bold">休暇者</span>
-              <span class="text-xs text-rose-600 font-medium">※カンマやスペース区切りで入力</span>
-            </div>
-            <div class="p-3">
-              ${state.isEditing ? `
-                <input type="text" id="input-0" placeholder="例: 片山, 遠藤" value="${escapeHTML(leavesData.staff)}" oninput="window.appUI.handleInputChange(0, this.value)" class="w-full p-2 border-2 border-rose-300 rounded-md outline-none focus:border-rose-500 transition-all font-medium text-sm bg-rose-50/30" />
-              ` : `
-                <div class="text-sm font-bold text-slate-800 min-h-[1.5rem] flex items-center">
-                  ${escapeHTML(leavesData.staff) || '<span class="text-slate-400 font-normal">（なし）</span>'}
+      return (
+        <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-28">
+          {/* Header */}
+          <header className="bg-blue-800 text-white p-3 sm:p-4 shadow-md sticky top-0 z-30">
+            <div className="max-w-4xl mx-auto flex justify-between items-start sm:items-center flex-col sm:flex-row gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
+                <div className="flex items-center gap-2">
+                  <Icon.Calendar className="w-5 h-5 text-blue-200" />
+                  <h1 className="text-lg font-bold tracking-tight">業務変更表</h1>
                 </div>
-              `}
-            </div>
-          </div>
-
-          <!-- 業務表メイン -->
-          <div class="bg-white rounded-lg shadow-sm border border-slate-300 overflow-hidden mb-8">
-            <div class="bg-slate-100 border-b-2 border-slate-300 px-4 py-3 flex justify-between items-center">
-              <h2 class="text-base font-black text-slate-700 flex items-center gap-1.5">
-                ${parseInt(state.selectedDate.split('-')[1])}/${parseInt(state.selectedDate.split('-')[2])} 
-                ${dayNames[new Date(state.selectedDate).getDay()]}
-              </h2>
-              ${state.isEditing ? `
-                <span class="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse border border-amber-300 flex items-center gap-1">
-                  <i data-lucide="edit" class="w-3 h-3"></i> 編集中
-                </span>
-              ` : ''}
-            </div>
-
-            <div class="divide-y-2 divide-slate-200">
-              ${boothsData.map((item, localIndex) => {
-                const dataIndex = localIndex + 1; // 休暇者が[0]なので+1
-                
-                // カスタム追加枠かどうかの判定
-                const isCustom = item.isCustom;
-                const defaultStaff = isCustom ? '' : (defaultBoothsData[localIndex]?.staff || '');
-                const currentStaff = item.staff;
-                
-                // カスタム枠は無条件に変更あり(赤字)扱いにするか、入力されていれば赤字にする
-                const changed = isCustom ? (currentStaff !== '') : (defaultStaff !== currentStaff);
-                
-                const conflictNames = leaveNames.filter(name => currentStaff.includes(name));
-                const hasLeaveConflict = conflictNames.length > 0;
-                const doubleBookings = doubleBookingConflicts[localIndex];
-                const hasDoubleBooking = doubleBookings && doubleBookings.length > 0;
-                const isError = hasLeaveConflict || hasDoubleBooking;
-                
-                return `
-                  <div class="flex flex-col sm:flex-row items-stretch transition-colors ${isError ? 'bg-red-50' : (changed && !state.isEditing) ? 'bg-amber-50/40' : 'hover:bg-slate-50'}">
-                    
-                    <!-- 左側：役割バッジ -->
-                    <div class="sm:w-1/3 p-2 sm:p-3 sm:border-r-2 border-slate-200 flex items-center justify-between sm:justify-start shrink-0 ${isError ? 'bg-red-100/50' : 'bg-slate-50/50'}">
-                      ${(isCustom && state.isEditing) ? `
-                        <input type="text" id="role-${dataIndex}" value="${escapeHTML(item.role)}" placeholder="枠名" oninput="window.appUI.handleCustomRoleChange(${dataIndex}, this.value)" class="w-full p-1.5 border-2 border-blue-300 rounded text-xs font-bold outline-none focus:border-blue-500 bg-white" />
-                        <button onclick="window.appUI.removeCustomBooth(${dataIndex})" class="ml-2 text-red-500 hover:bg-red-100 p-1 rounded transition-colors" title="枠を削除">
-                          <i data-lucide="x" class="w-4 h-4"></i>
-                        </button>
-                      ` : `
-                        <span class="inline-block px-2 py-1 rounded text-xs font-bold border w-full sm:w-auto text-center sm:text-left ${getRoleColor(item.role)}">
-                          ${escapeHTML(item.role)}
-                        </span>
-                      `}
-                    </div>
-                    
-                    <!-- 右側：担当者名 -->
-                    <div class="sm:w-2/3 p-2 sm:p-3 flex flex-col justify-center min-h-[3.5rem]">
-                      ${state.isEditing ? `
-                        <div class="w-full">
-                          ${(changed && !isCustom) ? `
-                            <div class="text-[10px] text-slate-400 mb-0.5 flex items-center gap-1">
-                              基本: ${escapeHTML(defaultStaff)} <span class="text-amber-500 font-bold">(変更あり)</span>
-                            </div>
-                          ` : ''}
-                          ${(isCustom) ? `
-                            <div class="text-[10px] text-blue-500 mb-0.5 font-bold flex items-center gap-1">
-                              <i data-lucide="plus" class="w-3 h-3"></i> 臨時追加枠
-                            </div>
-                          ` : ''}
-                          
-                          <input type="text" id="input-${dataIndex}" placeholder="担当者名" value="${escapeHTML(currentStaff)}" oninput="window.appUI.handleInputChange(${dataIndex}, this.value)" class="w-full p-2 border-2 rounded-md outline-none focus:border-blue-500 transition-all font-medium text-sm ${isError ? 'border-red-400 bg-red-50 text-red-900' : changed ? 'border-amber-300 bg-amber-50' : 'border-slate-300 bg-white'}" />
-                          
-                          ${hasLeaveConflict ? `
-                            <div class="text-red-600 text-[10px] font-bold mt-1 flex items-center gap-1">
-                              <i data-lucide="alert-triangle" class="w-3 h-3"></i> 休暇者 (${escapeHTML(conflictNames.join(', '))}) が含まれています
-                            </div>
-                          ` : ''}
-                          ${hasDoubleBooking ? doubleBookings.map(db => `
-                            <div class="text-red-600 text-[10px] font-bold mt-1 flex items-center gap-1">
-                              <i data-lucide="alert-triangle" class="w-3 h-3"></i> 重複: ${escapeHTML(db.name)} (他: ${escapeHTML(db.others.join(', '))})
-                            </div>
-                          `).join('') : ''}
-                        </div>
-                      ` : `
-                        <div class="flex items-center justify-between w-full">
-                          <div class="flex flex-col">
-                            ${(changed || isCustom) ? `
-                              ${(!isCustom) ? `
-                                <div class="flex items-center gap-1 text-slate-400 text-[10px] font-medium mb-0.5">
-                                  <span class="line-through decoration-slate-400">${escapeHTML(defaultStaff)}</span>
-                                  <i data-lucide="arrow-right" class="w-2.5 h-2.5"></i>
-                                </div>
-                              ` : `
-                                <div class="text-[10px] text-blue-500 font-bold mb-0.5">臨時追加枠</div>
-                              `}
-                              <span class="text-base sm:text-lg font-black drop-shadow-sm ${isError ? 'text-red-700' : 'text-red-600'}">
-                                ${escapeHTML(currentStaff) || '<span class="text-slate-300">未入力</span>'}
-                              </span>
-                            ` : `
-                              <span class="text-sm font-bold ${isError ? 'text-red-700' : 'text-slate-800'}">
-                                ${escapeHTML(currentStaff)}
-                              </span>
-                            `}
-                            
-                            ${hasLeaveConflict ? `
-                              <div class="text-red-600 text-[10px] font-bold mt-0.5 flex items-center gap-1">
-                                <i data-lucide="alert-triangle" class="w-3 h-3"></i> 休暇者 (${escapeHTML(conflictNames.join(', '))}) が含まれています
-                              </div>
-                            ` : ''}
-                            ${hasDoubleBooking ? doubleBookings.map(db => `
-                              <div class="text-red-600 text-[10px] font-bold mt-0.5 flex items-center gap-1">
-                                <i data-lucide="alert-triangle" class="w-3 h-3"></i> 重複: ${escapeHTML(db.name)} (他: ${escapeHTML(db.others.join(', '))})
-                              </div>
-                            `).join('') : ''}
-                          </div>
-                          
-                          <div class="flex gap-1 shrink-0 ml-2">
-                            ${isError ? `
-                              <span class="inline-flex items-center gap-1 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded font-bold shadow-sm">
-                                <i data-lucide="alert-triangle" class="w-3 h-3"></i>
-                                <span class="hidden sm:inline">アラート</span>
-                              </span>
-                            ` : ''}
-                            ${(changed && !isError) ? `
-                              <span class="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded font-bold border border-amber-300">
-                                <i data-lucide="alert-circle" class="w-3 h-3"></i>
-                                <span class="hidden sm:inline">変更あり</span>
-                              </span>
-                            ` : ''}
-                          </div>
-                        </div>
-                      `}
-                    </div>
-                  </div>
-                `;
-              }).join('')}
-              
-              <!-- 臨時枠追加ボタン (編集時のみ一番下に表示) -->
-              ${state.isEditing ? `
-                <div class="p-4 bg-slate-50 flex justify-center">
-                  <button onclick="window.appUI.addCustomBooth()" class="flex items-center gap-1.5 bg-white border-2 border-dashed border-blue-300 text-blue-600 hover:bg-blue-50 hover:border-blue-500 px-6 py-2.5 rounded-lg text-sm font-bold transition-colors w-full sm:w-auto shadow-sm">
-                    <i data-lucide="plus" class="w-4 h-4"></i> 臨時枠（ブース）を追加
-                  </button>
-                </div>
-              ` : ''}
-
-            </div>
-          </div>
-
-          <!-- 保存/キャンセル ボタン -->
-          ${state.isEditing ? `
-            <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-300 p-3 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] z-40">
-              <div class="max-w-4xl mx-auto flex justify-end gap-2">
-                <button onclick="window.appUI.handleCancel()" ${state.isSaving ? 'disabled' : ''} class="px-4 py-2 rounded-md text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors disabled:opacity-50 border border-slate-300">
-                  キャンセル
-                </button>
-                <button onclick="window.appUI.handleSave()" ${state.isSaving ? 'disabled' : ''} class="flex items-center gap-1.5 px-6 py-2 rounded-md text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors disabled:opacity-50">
-                  ${state.isSaving ? '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>' : '<i data-lucide="save" class="w-4 h-4"></i>'}
-                  ${state.isSaving ? '保存中...' : '変更を保存'}
-                </button>
-              </div>
-            </div>
-          ` : ''}
-        </main>
-
-        <!-- ログインモーダル -->
-        ${state.showLoginModal ? `
-          <div class="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-            <div class="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-              <div class="flex justify-between items-center p-4 border-b border-slate-200 bg-slate-50">
-                <h3 class="font-bold text-sm flex items-center gap-1.5 text-slate-800">
-                  <i data-lucide="lock" class="w-4 h-4 text-blue-600"></i>
-                  管理者ログイン
-                </h3>
-                <button onclick="window.appUI.closeLoginModal()" class="p-1 hover:bg-slate-200 rounded text-slate-500 transition-colors">
-                  <i data-lucide="x" class="w-4 h-4"></i>
-                </button>
-              </div>
-              
-              <form onsubmit="window.appUI.handleLogin(event)" class="p-5">
-                <p class="text-xs text-slate-600 mb-4 leading-relaxed">
-                  出番を変更するにはパスワードを入力してください。<br/>
-                  <span class="inline-block mt-1.5 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded font-bold border border-blue-200">
-                    パスワード: admin123
+                {lastUpdatedStr && (
+                  <span className="text-xs text-blue-200/90 font-medium flex items-center gap-1">
+                    <Icon.Clock className="w-3 h-3" /> 最終更新: {lastUpdatedStr}
                   </span>
-                </p>
-                
-                <div class="mb-5">
-                  <input type="password" placeholder="パスワード" value="${escapeHTML(state.passwordInput)}" oninput="window.appUI.handlePasswordChange(this.value)" class="w-full p-2.5 border-2 border-slate-300 rounded-md outline-none focus:border-blue-500 transition-all text-sm font-medium" autofocus />
-                  ${state.loginError ? `
-                    <p class="text-red-600 text-xs mt-1.5 flex items-center gap-1 font-bold">
-                      <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
-                      ${escapeHTML(state.loginError)}
-                    </p>
-                  ` : ''}
-                </div>
-                
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-md shadow-sm transition-colors text-sm">
-                  ログイン
-                </button>
-              </form>
+                )}
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                {isAdmin ? (
+                  <button onClick={() => {setIsAdmin(false); setIsEditing(false);}} className="flex items-center gap-1.5 text-xs bg-blue-900 hover:bg-blue-700 px-3 py-1.5 rounded-md border border-blue-700">
+                    <Icon.LogOut className="w-3.5 h-3.5" /> <span className="hidden sm:inline">ログアウト</span>
+                  </button>
+                ) : (
+                  <button onClick={() => setShowLoginModal(true)} className="flex items-center gap-1.5 text-xs bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-md border border-blue-500 shadow-sm">
+                    <Icon.Lock className="w-3.5 h-3.5" /> <span className="hidden sm:inline">管理者</span>
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        ` : ''}
-      `;
+          </header>
 
-      appDiv.innerHTML = html;
-      lucide.createIcons();
+          <main className="max-w-4xl mx-auto p-3 sm:p-4">
+            
+            {/* Nav */}
+            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 mb-4 sticky top-[72px] z-20">
+              <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-100">
+                <select value={selectedMonth} onChange={handleMonthChange} className="p-1.5 rounded-md border-2 border-blue-200 text-sm font-bold bg-blue-50 text-blue-800 outline-none focus:border-blue-500">
+                  <option value="2026-08">2026年 8月</option>
+                  <option value="2026-09">2026年 9月</option>
+                  <option value="2026-10">2026年 10月</option>
+                </select>
+                <button onClick={downloadCSV} className="flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-md text-xs font-bold hover:bg-emerald-700 shadow-sm">
+                  <Icon.Download className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Excel(CSV)出力</span><span className="sm:hidden">出力</span>
+                </button>
+              </div>
+              <div className="flex overflow-x-auto gap-1 pb-1.5 mb-1.5 border-b border-slate-100 hide-scrollbar">
+                {currentMonthWeeks.map(week => (
+                  <button key={week.id} onClick={() => handleWeekChange(week.id)} className={`whitespace-nowrap px-3 py-1.5 rounded-md text-xs font-bold ${selectedWeek === week.id ? 'bg-blue-100 text-blue-800' : 'text-slate-500 hover:bg-slate-100'}`}>
+                    {week.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex overflow-x-auto gap-1.5 hide-scrollbar">
+                {currentWeekData.dates.map(dateStr => {
+                  const d = new Date(dateStr);
+                  const isSelected = selectedDate === dateStr;
+                  return (
+                    <button key={dateStr} onClick={() => handleDateChange(dateStr)} className={`flex-1 min-w-[55px] flex flex-col items-center justify-center py-1.5 px-1 rounded-lg border ${isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}>
+                      <span className={`text-[10px] ${isSelected ? 'opacity-90' : 'text-slate-400'}`}>{d.getMonth()+1}/{d.getDate()}</span>
+                      <span className="text-sm font-bold">{dayNames[d.getDay()]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-      // フォーカスの復元
-      if (activeInputId) {
-        const el = document.getElementById(activeInputId);
-        if (el) {
-          el.focus();
-          try { el.setSelectionRange(activeSelectionStart, activeSelectionEnd); } catch(e){}
-        }
-      }
+            {/* Admin Panel */}
+            {(isAdmin && !isEditing) && (
+              <div className="bg-blue-50/50 rounded-lg border border-blue-200 p-3 mb-4 flex justify-between items-center">
+                <div className="flex items-center gap-1.5 text-blue-800">
+                  <Icon.ShieldAlert className="w-4 h-4" /> <span className="font-bold text-xs">管理者モード</span>
+                </div>
+                <button onClick={handleEditStart} className="flex items-center gap-1.5 bg-white border border-blue-600 text-blue-700 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm">
+                  <Icon.Edit className="w-3.5 h-3.5" /> 出番を変更・追加する
+                </button>
+              </div>
+            )}
+
+            {/* Leaves */}
+            <div className="bg-white rounded-lg shadow-sm border-2 border-rose-200 mb-4 overflow-hidden">
+              <div className="bg-rose-50 border-b border-rose-200 px-4 py-2.5 flex items-center gap-2">
+                <span className="bg-rose-100 text-rose-800 text-xs px-2 py-1 rounded border border-rose-300 font-bold">休暇者</span>
+                <span className="text-xs text-rose-600 font-medium">※カンマやスペース区切りで入力</span>
+              </div>
+              <div className="p-3">
+                {isEditing ? (
+                  <input type="text" placeholder="例: 片山, 遠藤" value={leavesData.staff} onChange={(e) => handleInputChange(0, e.target.value)} className="w-full p-2 border-2 border-rose-300 rounded-md outline-none focus:border-rose-500 font-medium text-sm bg-rose-50/30" />
+                ) : (
+                  <div className="text-sm font-bold text-slate-800 min-h-[1.5rem] flex items-center">
+                    {leavesData.staff || <span className="text-slate-400 font-normal">（なし）</span>}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Booths */}
+            <div className="bg-white rounded-lg shadow-sm border border-slate-300 overflow-hidden mb-8">
+              <div className="bg-slate-100 border-b-2 border-slate-300 px-4 py-3 flex justify-between items-center">
+                <h2 className="text-base font-black text-slate-700">
+                  {new Date(selectedDate).getMonth()+1}/{new Date(selectedDate).getDate()} {dayNames[new Date(selectedDate).getDay()]}
+                </h2>
+                {isEditing && (
+                  <span className="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 animate-pulse border border-amber-300">
+                    <Icon.Edit className="w-3 h-3" /> 編集中
+                  </span>
+                )}
+              </div>
+
+              <div className="divide-y-2 divide-slate-200">
+                {boothsData.map((item, localIndex) => {
+                  const dataIndex = localIndex + 1;
+                  const isCustom = item.isCustom;
+                  const defaultStaff = isCustom ? '' : (defaultBoothsData[localIndex]?.staff || '');
+                  const currentStaff = item.staff;
+                  const changed = isCustom ? (currentStaff !== '') : (defaultStaff !== currentStaff);
+                  
+                  const conflictNames = leaveNames.filter(name => currentStaff.includes(name));
+                  const hasLeaveConflict = conflictNames.length > 0;
+                  const doubleBookings = doubleBookingConflicts[localIndex];
+                  const hasDoubleBooking = doubleBookings && doubleBookings.length > 0;
+                  const isError = hasLeaveConflict || hasDoubleBooking;
+                  
+                  return (
+                    <div key={dataIndex} className={`flex flex-col sm:flex-row items-stretch ${isError ? 'bg-red-50' : (changed && !isEditing) ? 'bg-amber-50/40' : 'hover:bg-slate-50'}`}>
+                      {/* Left: Role */}
+                      <div className={`sm:w-1/3 p-2 sm:p-3 sm:border-r-2 border-slate-200 flex items-center justify-between sm:justify-start shrink-0 ${isError ? 'bg-red-100/50' : 'bg-slate-50/50'}`}>
+                        {(isCustom && isEditing) ? (
+                          <div className="flex w-full items-center">
+                            <input type="text" value={item.role} placeholder="枠名" onChange={(e) => handleCustomRoleChange(dataIndex, e.target.value)} className="w-full p-1.5 border-2 border-blue-300 rounded text-xs font-bold outline-none focus:border-blue-500 bg-white" />
+                            <button onClick={() => removeCustomBooth(dataIndex)} className="ml-2 text-red-500 hover:bg-red-100 p-1 rounded" title="枠を削除"><Icon.X className="w-4 h-4" /></button>
+                          </div>
+                        ) : (
+                          <span className={`inline-block px-2 py-1 rounded text-xs font-bold border w-full sm:w-auto text-center sm:text-left ${getRoleColor(item.role)}`}>{item.role}</span>
+                        )}
+                      </div>
+                      
+                      {/* Right: Staff */}
+                      <div className="sm:w-2/3 p-2 sm:p-3 flex flex-col justify-center min-h-[3.5rem]">
+                        {isEditing ? (
+                          <div className="w-full">
+                            {(changed && !isCustom) && (
+                              <div className="text-[10px] text-slate-400 mb-0.5 flex items-center gap-1">基本: {defaultStaff} <span className="text-amber-500 font-bold">(変更あり)</span></div>
+                            )}
+                            {isCustom && <div className="text-[10px] text-blue-500 mb-0.5 font-bold flex items-center gap-1"><Icon.Plus className="w-3 h-3"/> 臨時追加枠</div>}
+                            
+                            <input type="text" placeholder="担当者名" value={currentStaff} onChange={(e) => handleInputChange(dataIndex, e.target.value)} className={`w-full p-2 border-2 rounded-md outline-none focus:border-blue-500 font-medium text-sm ${isError ? 'border-red-400 bg-red-50 text-red-900' : changed ? 'border-amber-300 bg-amber-50' : 'border-slate-300 bg-white'}`} />
+                            
+                            {hasLeaveConflict && <div className="text-red-600 text-[10px] font-bold mt-1 flex items-center gap-1"><Icon.AlertTriangle className="w-3 h-3"/> 休暇者 ({conflictNames.join(', ')}) が含まれています</div>}
+                            {hasDoubleBooking && doubleBookings.map((db, i) => <div key={i} className="text-red-600 text-[10px] font-bold mt-1 flex items-center gap-1"><Icon.AlertTriangle className="w-3 h-3"/> 重複: {db.name} (他: {db.others.join(', ')})</div>)}
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex flex-col">
+                              {(changed || isCustom) ? (
+                                <>
+                                  {!isCustom ? (
+                                    <div className="flex items-center gap-1 text-slate-400 text-[10px] font-medium mb-0.5"><span className="line-through">{defaultStaff}</span><Icon.ArrowRight className="w-2.5 h-2.5" /></div>
+                                  ) : <div className="text-[10px] text-blue-500 font-bold mb-0.5">臨時追加枠</div>}
+                                  <span className={`text-base sm:text-lg font-black drop-shadow-sm ${isError ? 'text-red-700' : 'text-red-600'}`}>{currentStaff || <span className="text-slate-300">未入力</span>}</span>
+                                </>
+                              ) : (
+                                <span className={`text-sm font-bold ${isError ? 'text-red-700' : 'text-slate-800'}`}>{currentStaff}</span>
+                              )}
+                              
+                              {hasLeaveConflict && <div className="text-red-600 text-[10px] font-bold mt-0.5 flex items-center gap-1"><Icon.AlertTriangle className="w-3 h-3"/> 休暇者 ({conflictNames.join(', ')}) が含まれています</div>}
+                              {hasDoubleBooking && doubleBookings.map((db, i) => <div key={i} className="text-red-600 text-[10px] font-bold mt-0.5 flex items-center gap-1"><Icon.AlertTriangle className="w-3 h-3"/> 重複: {db.name} (他: {db.others.join(', ')})</div>)}
+                            </div>
+                            
+                            <div className="flex gap-1 shrink-0 ml-2">
+                              {isError && <span className="inline-flex items-center gap-1 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded font-bold shadow-sm"><Icon.AlertTriangle className="w-3 h-3"/><span className="hidden sm:inline">アラート</span></span>}
+                              {(changed && !isError) && <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded font-bold border border-amber-300"><Icon.AlertCircle className="w-3 h-3"/><span className="hidden sm:inline">変更あり</span></span>}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {isEditing && (
+                  <div className="p-4 bg-slate-50 flex justify-center">
+                    <button onClick={addCustomBooth} className="flex items-center gap-1.5 bg-white border-2 border-dashed border-blue-300 text-blue-600 hover:bg-blue-50 px-6 py-2.5 rounded-lg text-sm font-bold w-full sm:w-auto shadow-sm">
+                      <Icon.Plus className="w-4 h-4" /> 臨時枠（ブース）を追加
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </main>
+
+          {isEditing && (
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-300 p-3 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] z-40">
+              <div className="max-w-4xl mx-auto flex justify-end gap-2">
+                <button onClick={() => setIsEditing(false)} disabled={isSaving} className="px-4 py-2 rounded-md text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-300">キャンセル</button>
+                <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-1.5 px-6 py-2 rounded-md text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm disabled:opacity-50">
+                  {isSaving ? <Icon.Loader2 className="w-4 h-4 animate-spin" /> : <Icon.Save className="w-4 h-4" />}
+                  {isSaving ? '保存中...' : '変更を保存'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {showLoginModal && (
+            <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-slate-50">
+                  <h3 className="font-bold text-sm flex items-center gap-1.5 text-slate-800"><Icon.Lock className="w-4 h-4 text-blue-600" /> 管理者ログイン</h3>
+                  <button onClick={() => {setShowLoginModal(false); setLoginError(''); setPassword('');}} className="p-1 hover:bg-slate-200 rounded text-slate-500"><Icon.X className="w-4 h-4" /></button>
+                </div>
+                <form onSubmit={handleLogin} className="p-5">
+                  <p className="text-xs text-slate-600 mb-4 leading-relaxed">出番を変更するにはパスワードを入力してください。<br/><span className="inline-block mt-1.5 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded font-bold border border-blue-200">パスワード: admin123</span></p>
+                  <div className="mb-5">
+                    <input type="password" placeholder="パスワード" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-2.5 border-2 border-slate-300 rounded-md outline-none focus:border-blue-500 text-sm font-medium" autoFocus />
+                    {loginError && <p className="text-red-600 text-xs mt-1.5 flex items-center gap-1 font-bold"><Icon.AlertCircle className="w-3.5 h-3.5" /> {loginError}</p>}
+                  </div>
+                  <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-md shadow-sm text-sm">ログイン</button>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      );
     }
 
-    // ============================================================================
-    // データ初期化・リスナー登録
-    // ============================================================================
-    const initAuth = async () => {
-      try {
-        await signInAnonymously(auth);
-      } catch (error) {
-        console.error("Auth error:", error);
-        state.isLoading = false;
-        render();
-      }
-    };
-    initAuth();
-
-    onAuthStateChanged(auth, (currentUser) => {
-      state.user = currentUser;
-      if (!currentUser) {
-        state.isLoading = false;
-        render();
-      } else {
-        // カレンダー全日分のデータをFirestoreから監視
-        Object.keys(defaultSchedules).forEach(dateKey => {
-          const docRef = doc(db, 'artifacts', 'gastro-schedule', 'public', 'data', COLLECTION_NAME, dateKey);
-          onSnapshot(docRef, 
-            (snapshot) => {
-              if (snapshot.exists()) {
-                const data = snapshot.data();
-                const parsedStaffData = JSON.parse(data.staffData);
-                state.schedules[dateKey] = parsedStaffData;
-                state.updatedAts[dateKey] = data.updatedAt; // 最終更新日時を記録
-              } else {
-                state.schedules[dateKey] = defaultSchedules[dateKey];
-              }
-              state.isLoading = false;
-              
-              if (!state.isEditing) {
-                render();
-              }
-            },
-            (error) => {
-              console.error(`Error fetching:`, error);
-              state.isLoading = false;
-              render();
-            }
-          );
-        });
-      }
-    });
-
+    // 読み込み完了後に描画を実行
+    if (window.FirebaseLib) {
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    } else {
+      window.addEventListener('firebase-loaded', () => {
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+      });
+    }
   </script>
 </body>
 </html>
