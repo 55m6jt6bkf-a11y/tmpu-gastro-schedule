@@ -242,7 +242,15 @@
       const staffMap = {}; 
       booths.forEach((booth, localIndex) => {
         if (!booth.staff || booth.role === '上部EUS') return; 
-        const names = booth.staff.split(/[\s,、・]+|or/).map(n => n.trim()).filter(n => n.length > 0 && n !== 'なし' && !n.includes('年目') && n !== 'back' && n !== 'up');
+        const names = booth.staff.split(/[\s,、・]+|or/).map(n => n.trim()).filter(n => {
+          if (n.length === 0) return false;
+          if (n === 'なし') return false;
+          if (n.includes('年目')) return false;
+          if (n === 'back' || n === 'up') return false;
+          // ✕、☓、×、英字のXなどは重複チェックから除外
+          if (['✕', '☓', '×', 'x', 'X'].includes(n)) return false; 
+          return true;
+        });
         const period = getPeriod(booth.role);
         names.forEach(name => {
           if (!staffMap[name]) staffMap[name] = [];
