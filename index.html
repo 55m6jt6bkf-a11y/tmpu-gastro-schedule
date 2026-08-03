@@ -15,8 +15,9 @@
   <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   
-  <!-- SheetJS -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <!-- ExcelJS & FileSaver (背景色やリッチテキスト出力用) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
   <style>
     .hide-scrollbar::-webkit-scrollbar { display: none; }
@@ -210,7 +211,6 @@
     };
     const defaultSchedules = generateDefaultSchedules();
 
-    // 日本の祝日（2026年8月〜10月の平日）
     const PUBLIC_HOLIDAYS = ['2026-08-11', '2026-09-21', '2026-09-22', '2026-09-23', '2026-10-12'];
     const defaultHolidays = {};
     weeksData.forEach(week => {
@@ -218,55 +218,6 @@
         defaultHolidays[d] = PUBLIC_HOLIDAYS.includes(d);
       });
     });
-
-    // 初期表示用の日付を計算 (当日を基準とする)
-    const todayDateObj = new Date();
-    const getLocalDateString = (dateObj) => {
-      const y = dateObj.getFullYear();
-      const m = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const d = String(dateObj.getDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
-    };
-    const todayStr = getLocalDateString(todayDateObj);
-
-    let initialMonth = months.length > 0 ? months[0] : 8;
-    let initialWeekId = weeksData.length > 0 ? weeksData[0].id : '';
-    let initialDate = weeksData.length > 0 ? weeksData[0].dates[0] : '';
-    let todayFound = false;
-
-    // 当日の日付がデータ内に存在するか検索
-    for (const week of weeksData) {
-      if (week.dates.includes(todayStr)) {
-        initialMonth = week.month;
-        initialWeekId = week.id;
-        initialDate = todayStr;
-        todayFound = true;
-        break;
-      }
-    }
-
-    // 当日が含まれていない場合は、当日以降の最初の日付を探す
-    if (!todayFound) {
-      for (const week of weeksData) {
-        for (const dStr of week.dates) {
-          if (dStr >= todayStr) {
-            initialMonth = week.month;
-            initialWeekId = week.id;
-            initialDate = dStr;
-            todayFound = true;
-            break;
-          }
-        }
-        if (todayFound) break;
-      }
-      // 全て過去日付の場合は最後のデータを初期値にする
-      if (!todayFound && weeksData.length > 0) {
-        const lastWeek = weeksData[weeksData.length - 1];
-        initialMonth = lastWeek.month;
-        initialWeekId = lastWeek.id;
-        initialDate = lastWeek.dates[lastWeek.dates.length - 1];
-      }
-    }
 
     const getRoleColor = (role, isNewBooth = false) => {
       if (role === '休暇者') return 'bg-rose-100 text-rose-800 border-rose-300';
@@ -281,6 +232,37 @@
       if (role.includes('AUS')) return 'bg-pink-50 text-pink-800 border-pink-200';
       if (role.includes('back up')) return 'bg-slate-700 text-white border-slate-800';
       return 'bg-white text-slate-700 border-slate-300';
+    };
+
+    // Excel出力用の背景色・文字色を取得する関数 (ARGB形式)
+    const getRoleExcelStyle = (role, isNewBooth = false) => {
+      let bgColor = 'FFFFFFFF'; // white
+      let fontColor = 'FF000000'; // black
+
+      if (role === '休暇者') {
+        bgColor = 'FFFFE4E6'; // rose-100
+      } else if (isNewBooth) {
+        bgColor = 'FFFAEAFF'; // fuchsia-100 近似色
+      } else {
+        const externals = ['若林', '女川', '涌谷', '一番町', '健診', '刈田', '真壁', '矢本', '渡辺', '佐藤', 'ゆう', '高砂', '循環器', '葵会', '米谷'];
+        if (externals.some(kw => role.includes(kw))) {
+          bgColor = 'FFF5F5F4'; // stone-100
+        } else if (role.includes('新患')) {
+          bgColor = 'FFECFDF5'; // emerald-50
+        } else if (role.includes('EGD')) {
+          bgColor = 'FFEFF6FF'; // blue-50
+        } else if (role.includes('EUS')) {
+          bgColor = 'FFFAF5FF'; // purple-50
+        } else if (role.includes('CS')) {
+          bgColor = 'FFFFF7ED'; // orange-50
+        } else if (role.includes('AUS')) {
+          bgColor = 'FFFDF2F8'; // pink-50
+        } else if (role.includes('back up')) {
+          bgColor = 'FF334155'; // slate-700
+          fontColor = 'FFFFFFFF'; // white (白抜き)
+        }
+      }
+      return { bgColor, fontColor };
     };
 
     const PM_BOOTHS = ['若林午後CS', '若林CS', '午後CS', 'ゆうファミリー', '循環器センター'];
@@ -335,10 +317,9 @@
       const [holidays, setHolidays] = useState(defaultHolidays);
       const [schedulesMetadata, setSchedulesMetadata] = useState({});
       
-      // 計算した初期値をセットする
-      const [selectedMonth, setSelectedMonth] = useState(initialMonth);
-      const [selectedWeek, setSelectedWeek] = useState(initialWeekId);
-      const [selectedDate, setSelectedDate] = useState(initialDate);
+      const [selectedMonth, setSelectedMonth] = useState(8);
+      const [selectedWeek, setSelectedWeek] = useState(weeksData[0].id);
+      const [selectedDate, setSelectedDate] = useState(weeksData[0].dates[0]);
       
       const [isAdmin, setIsAdmin] = useState(false);
       const [isEditMode, setIsEditMode] = useState(false);
@@ -352,6 +333,37 @@
       const [loginError, setLoginError] = useState('');
 
       useEffect(() => {
+        // 現在の日付をもとに、初期表示すべき日付を決定する
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        
+        let initialDate = weeksData[0].dates[0];
+        let initialWeekId = weeksData[0].id;
+        let initialMonth = weeksData[0].month;
+
+        const allDates = weeksData.flatMap(w => w.dates);
+        
+        if (allDates.includes(todayStr)) {
+            // 当日がデータに含まれる場合
+            initialDate = todayStr;
+            const week = weeksData.find(w => w.dates.includes(todayStr));
+            initialWeekId = week.id;
+            initialMonth = week.month;
+        } else {
+            // 当日がデータに含まれない（土日や過去・未来）場合、今日以降で一番近い日を探す
+            const futureDates = allDates.filter(d => new Date(d) >= today);
+            if (futureDates.length > 0) {
+                initialDate = futureDates[0];
+                const week = weeksData.find(w => w.dates.includes(initialDate));
+                initialWeekId = week.id;
+                initialMonth = week.month;
+            }
+        }
+
+        setSelectedDate(initialDate);
+        setSelectedWeek(initialWeekId);
+        setSelectedMonth(initialMonth);
+
         const initAuth = async () => {
           try {
             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -491,6 +503,7 @@
       };
 
       const getStrWidth = (str) => {
+        if (!str) return 0;
         let len = 0;
         for (let i = 0; i < str.length; i++) {
           len += str.charCodeAt(i) >= 256 ? 2 : 1;
@@ -498,34 +511,30 @@
         return len;
       };
 
-      // エクスポートのタイプ (週: 'week', 月: 'month') を受け取るように変更
-      const handleExportExcel = (exportType = 'week') => {
+      // ExcelJSを利用した出力処理
+      const handleExportExcel = async (type = 'week') => {
         let dates = [];
-        let exportTitle = "";
-        
-        if (exportType === 'month') {
-          // 月ごと出力の場合
-          const monthWeeks = weeksData.filter(w => w.month === selectedMonth);
-          monthWeeks.forEach(w => {
-            dates = dates.concat(w.dates);
-          });
-          exportTitle = `${selectedMonth}月分`;
+        let fileName = "";
+
+        if (type === 'month') {
+           const monthWeeks = weeksData.filter(w => w.month === selectedMonth);
+           monthWeeks.forEach(w => dates.push(...w.dates));
+           fileName = `業務変更表_${selectedMonth}月分.xlsx`;
         } else {
-          // 週ごと出力の場合
-          const week = weeksData.find(w => w.id === selectedWeek);
-          dates = week.dates;
-          exportTitle = `週_${dates[0].replace(/-/g, '')}`;
+           const week = weeksData.find(w => w.id === selectedWeek);
+           dates = week.dates;
+           fileName = `業務変更表_${dates[0].replace(/-/g, '')}.xlsx`;
         }
 
-        const weekSchedules = dates.map(d => pendingChanges[d] || schedules[d] || defaultSchedules[d]);
-        const weekDefaultSchedules = dates.map(d => defaultSchedules[d]);
-        const weekHolidays = dates.map(d => pendingHolidays[d] !== undefined ? pendingHolidays[d] : holidays[d]);
+        const exportSchedules = dates.map(d => pendingChanges[d] || schedules[d] || defaultSchedules[d]);
+        const exportDefaultSchedules = dates.map(d => defaultSchedules[d]);
+        const exportHolidays = dates.map(d => pendingHolidays[d] !== undefined ? pendingHolidays[d] : holidays[d]);
         
         // 元データの「役割」の順序を抽出
         const allRolesObj = {}; 
-        weekSchedules.forEach((dayData, index) => {
-          if (!weekHolidays[index]) {
-             weekDefaultSchedules[index].forEach((item, idx) => {
+        exportSchedules.forEach((dayData, index) => {
+          if (!exportHolidays[index]) {
+             exportDefaultSchedules[index].forEach((item, idx) => {
                 if (allRolesObj[item.role] === undefined) {
                    allRolesObj[item.role] = idx;
                 }
@@ -544,79 +553,111 @@
           return allRolesObj[a] - allRolesObj[b];
         });
 
-        const header = ['日付', ...allRoles];
-        const data = [header];
-        
-        const colWidths = new Array(header.length).fill(4);
-        header.forEach((text, i) => {
-           colWidths[i] = Math.max(colWidths[i], getStrWidth(text) + 2);
+        // ワークブック・シート作成
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet("スケジュール");
+
+        // 列の設定 (ヘッダー文字数から初期幅を計算)
+        const columns = [
+          { header: '日付', key: 'date', width: 12 },
+          ...allRoles.map(role => ({ header: role, key: role, width: Math.max(getStrWidth(role) + 4, 12) }))
+        ];
+        worksheet.columns = columns;
+
+        // ヘッダー行の装飾
+        const headerRow = worksheet.getRow(1);
+        headerRow.eachCell((cell) => {
+          cell.font = { bold: true };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
         });
 
         dates.forEach((d, i) => {
-          const rowData = [];
+          const row = worksheet.addRow({});
           const dateStr = `${d.split('-')[1]}/${d.split('-')[2]}${getDayName(d)}`;
-          rowData.push(dateStr);
-          colWidths[0] = Math.max(colWidths[0], getStrWidth(dateStr) + 2);
+          
+          // 日付セル
+          const dateCell = row.getCell(1);
+          dateCell.value = dateStr;
+          dateCell.alignment = { vertical: 'middle', horizontal: 'center' };
+          dateCell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
 
-          const isHol = weekHolidays[i];
+          const isHol = exportHolidays[i];
 
           allRoles.forEach((role, colIndex) => {
-            const actualColIndex = colIndex + 1;
+            const cell = row.getCell(colIndex + 2);
+            cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+            cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
 
             if (isHol) {
               if (role === '休暇者') {
-                 rowData.push({ v: "休診日", t: 's', s: { font: { color: { rgb: "E11D48" }, bold: true } } });
-                 colWidths[actualColIndex] = Math.max(colWidths[actualColIndex], 10);
-              } else {
-                 rowData.push("");
+                 cell.value = "休診日";
+                 cell.font = { color: { argb: 'FFE11D48' }, bold: true };
+                 cell.alignment = { vertical: 'middle', horizontal: 'center' };
               }
               return;
             }
 
-            const dayData = weekSchedules[i];
-            const defaultDayData = weekDefaultSchedules[i];
+            const dayData = exportSchedules[i];
+            const defaultDayData = exportDefaultSchedules[i];
             
             const currentItem = dayData.find(item => item.role === role);
             const defaultItem = defaultDayData.find(item => item.role === role);
             
             const currentStaff = currentItem ? currentItem.staff : "";
             const defaultStaff = defaultItem ? defaultItem.staff : "";
+            const isNewBooth = !defaultItem && currentItem;
+
+            // 役割に応じた背景色と基本文字色の取得
+            const { bgColor, fontColor } = getRoleExcelStyle(role, isNewBooth);
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
 
             if (!currentItem && !defaultItem) {
-               rowData.push("");
-               return;
+               return; // 空の枠
             }
             
             if (role === '休暇者') {
               if (currentStaff !== defaultStaff) {
-                rowData.push({ v: currentStaff, t: 's', s: { font: { color: { rgb: "FF0000" }, bold: true } } });
-                colWidths[actualColIndex] = Math.max(colWidths[actualColIndex], getStrWidth(currentStaff) + 2);
+                cell.value = currentStaff;
+                cell.font = { color: { argb: 'FFFF0000' }, bold: true };
               } else {
-                rowData.push(currentStaff);
-                colWidths[actualColIndex] = Math.max(colWidths[actualColIndex], getStrWidth(currentStaff) + 2);
+                cell.value = currentStaff;
+                cell.font = { color: { argb: fontColor } };
               }
-            } else if (!defaultItem && currentItem) {
-              const text = `【追加枠】\n${currentStaff}`;
-              rowData.push({ v: text, t: 's', s: { font: { color: { rgb: "FF0000" }, bold: true }, alignment: { wrapText: true } } });
-              colWidths[actualColIndex] = Math.max(colWidths[actualColIndex], getStrWidth(currentStaff) + 2);
+            } else if (isNewBooth) {
+              cell.value = {
+                  richText: [
+                      { font: { color: { argb: 'FFFF0000' }, bold: true }, text: `【追加枠】\n` },
+                      { font: { color: { argb: 'FFFF0000' }, bold: true }, text: currentStaff }
+                  ]
+              };
             } else if (currentStaff !== defaultStaff) {
-              const text = `旧: ${defaultStaff}\n新: ${currentStaff}`;
-              rowData.push({ v: text, t: 's', s: { font: { color: { rgb: "FF0000" }, bold: true }, alignment: { wrapText: true } } });
-              colWidths[actualColIndex] = Math.max(colWidths[actualColIndex], getStrWidth(text) + 2);
+              // 旧(基本)は黒または白、新(変更後)は赤にするリッチテキスト設定
+              cell.value = {
+                  richText: [
+                      { font: { color: { argb: fontColor } }, text: `旧: ${defaultStaff}\n` },
+                      { font: { color: { argb: 'FFFF0000' }, bold: true }, text: `新: ${currentStaff}` }
+                  ]
+              };
             } else {
-              rowData.push(currentStaff);
-              colWidths[actualColIndex] = Math.max(colWidths[actualColIndex], getStrWidth(currentStaff) + 2);
+              cell.value = currentStaff;
+              cell.font = { color: { argb: fontColor } };
+            }
+
+            // コンテンツに応じた列幅の自動調整（簡易）
+            const currentWidth = worksheet.getColumn(colIndex + 2).width;
+            const contentWidth = getStrWidth(currentStaff) + (currentStaff !== defaultStaff ? 4 : 0);
+            if (contentWidth > currentWidth) {
+                worksheet.getColumn(colIndex + 2).width = Math.min(contentWidth + 2, 30); // 最大幅を30程度に抑える
             }
           });
-          data.push(rowData);
         });
 
-        const ws = XLSX.utils.aoa_to_sheet(data);
-        ws['!cols'] = colWidths.map(w => ({ wch: w }));
-
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "スケジュール");
-        XLSX.writeFile(wb, `業務変更表_${exportTitle}.xlsx`);
+        // ワークブックをBlobとして書き出しダウンロード
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        saveAs(blob, fileName);
       };
 
       const handleLogin = (e) => {
@@ -647,6 +688,7 @@
       const boothsData = activeData.slice(1);
       const defaultBoothsData = defaultSchedules[selectedDate].slice(1);
 
+      // Parse leave names with optional period restrictions (AM/PM/午前/午後)
       const parseLeaveNames = (leaveStr) => {
         const leaves = [];
         const entries = leaveStr.split(/[\s,、・]+|or/).filter(e => e.trim().length > 0);
@@ -676,9 +718,19 @@
 
       const doubleBookingConflicts = checkConflicts(boothsData);
 
-      const currentMetadata = schedulesMetadata[selectedDate];
-      const updatedAtStr = currentMetadata 
-        ? new Date(currentMetadata).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+      // 全データを通した最終更新日時の計算
+      let latestUpdate = null;
+      Object.values(schedulesMetadata).forEach(dateStr => {
+        if (dateStr) {
+          const dateObj = new Date(dateStr);
+          if (!latestUpdate || dateObj > latestUpdate) {
+            latestUpdate = dateObj;
+          }
+        }
+      });
+
+      const updatedAtStr = latestUpdate 
+        ? latestUpdate.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
         : '未更新';
 
       const changedDatesSet = new Set([...Object.keys(pendingChanges), ...Object.keys(pendingHolidays)]);
@@ -749,8 +801,6 @@
                     </button>
                   ))}
                 </div>
-                
-                {/* Excel出力を2つのボタンに分割 */}
                 <div className="flex gap-1.5 shrink-0">
                   <button
                     onClick={() => handleExportExcel('week')}
@@ -763,7 +813,7 @@
                   <button
                     onClick={() => handleExportExcel('month')}
                     className="flex items-center gap-1 text-xs bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 px-2 py-1.5 rounded transition-colors font-bold shadow-sm"
-                    title="表示されている月全体をExcelに出力"
+                    title="表示されている月をすべてExcelに出力"
                   >
                     <IconDownload className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">月出力</span>
@@ -878,6 +928,7 @@
                   </div>
 
                   <div className="flex flex-col">
+                    {}
                     {boothsData.map((item, localIndex) => {
                       const dataIndex = localIndex + 1;
                       
@@ -888,9 +939,11 @@
                       const currentStaff = item.staff;
                       const changed = isNewBooth || defaultStaff !== currentStaff;
                       
+                      // Extract names from the current booth
                       const currentBoothNames = currentStaff.split(/[\s,、・]+|or/).map(n => n.replace(/[（\(].*?[）\)]/g, '').trim()).filter(n => n.length > 0);
                       const currentBoothPeriod = getPeriod(item.role);
 
+                      // Find conflicts specifically considering AM/PM leaves
                       const conflictLeavesForThisBooth = parsedLeaves.filter(leave => {
                          if (!currentBoothNames.includes(leave.name)) return false;
                          return leave.leavePeriod === 'ALL' || leave.leavePeriod === currentBoothPeriod;
@@ -1155,4 +1208,5 @@
   </script>
 </body>
 </html>
+
 
