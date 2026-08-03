@@ -247,8 +247,8 @@
           if (n === 'なし') return false;
           if (n.includes('年目')) return false;
           if (n === 'back' || n === 'up') return false;
-          // ✕、☓、×、英字のXなどは重複チェックから除外
-          if (['✕', '☓', '×', 'x', 'X'].includes(n)) return false; 
+          // ✕、☓、×、✗、英字のXなどは重複チェックから除外
+          if (/^[✕☓×✗xX]+$/.test(n)) return false; 
           return true;
         });
         const period = getPeriod(booth.role);
