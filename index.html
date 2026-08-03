@@ -242,7 +242,8 @@
       const staffMap = {}; 
       booths.forEach((booth, localIndex) => {
         if (!booth.staff || booth.role === '上部EUS') return; 
-        const names = booth.staff.split(/[\s,、・]+|or/).map(n => n.replace(/[（\(].*?[）\)]/g, '').trim()).filter(n => {
+        // (潤) 以外の括弧を削除して名前を抽出する
+        const names = booth.staff.split(/[\s,、・]+|or/).map(n => n.replace(/[（\(](?!潤[）\)]).*?[）\)]/g, '').trim()).filter(n => {
           if (n.length === 0) return false;
           if (n === 'なし') return false;
           if (n.includes('年目')) return false;
@@ -456,17 +457,15 @@
         const weekDefaultSchedules = dates.map(d => defaultSchedules[d]);
         const weekHolidays = dates.map(d => pendingHolidays[d] !== undefined ? pendingHolidays[d] : holidays[d]);
         
-        // 元データの「役割」の順序を抽出（「新患④」などを本来の順番通りに出すため）
+        // 元データの「役割」の順序を抽出
         const allRolesObj = {}; 
         weekSchedules.forEach((dayData, index) => {
-          // 該当曜日が休診日でない場合、その日の基本ブース配列の順序を登録
           if (!weekHolidays[index]) {
              weekDefaultSchedules[index].forEach((item, idx) => {
                 if (allRolesObj[item.role] === undefined) {
                    allRolesObj[item.role] = idx;
                 }
              });
-             // 追加枠があればそれも登録
              dayData.forEach(item => {
                 if (allRolesObj[item.role] === undefined) {
                    allRolesObj[item.role] = 999;
@@ -501,7 +500,6 @@
             const actualColIndex = colIndex + 1;
 
             if (isHol) {
-              // 休診日の場合：休暇者列に「休診日」と出す
               if (role === '休暇者') {
                  rowData.push({ v: "休診日", t: 's', s: { font: { color: { rgb: "E11D48" }, bold: true } } });
                  colWidths[actualColIndex] = Math.max(colWidths[actualColIndex], 10);
@@ -520,7 +518,6 @@
             const currentStaff = currentItem ? currentItem.staff : "";
             const defaultStaff = defaultItem ? defaultItem.staff : "";
 
-            // ブースが本来その曜日に存在しない場合は空欄
             if (!currentItem && !defaultItem) {
                rowData.push("");
                return;
@@ -586,7 +583,36 @@
       const boothsData = activeData.slice(1);
       const defaultBoothsData = defaultSchedules[selectedDate].slice(1);
 
-      const leaveNames = leavesData.staff.split(/[\s,、・]+|or/).map(name => name.replace(/[（\(].*?[）\)]/g, '').trim()).filter(name => name.length > 0);
+      // Parse leave names with optional period restrictions (AM/PM/午前/午後)
+      const parseLeaveNames = (leaveStr) => {
+        const leaves = [];
+        const entries = leaveStr.split(/[\s,、・]+|or/).filter(e => e.trim().length > 0);
+        
+        entries.forEach(entry => {
+          // (潤) 以外の括弧を削除して名前を抽出
+          let name = entry.replace(/[（\(](?!潤[）\)]).*?[）\)]/g, '').trim();
+          let leavePeriod = 'ALL'; // Default: leave applies to all day
+          
+          if (name.length === 0) return;
+
+          // Check if the original entry contains period specifiers in brackets
+          const originalWithBracketsMatch = entry.match(/[（\(](?!潤[）\)]).*?[）\)]/);
+          if (originalWithBracketsMatch) {
+            const reason = originalWithBracketsMatch[0].toUpperCase();
+            if (reason.includes('AM') || reason.includes('午前')) {
+              leavePeriod = 'AM';
+            } else if (reason.includes('PM') || reason.includes('午後')) {
+              leavePeriod = 'PM';
+            }
+          }
+          leaves.push({ name, leavePeriod });
+        });
+        return leaves;
+      };
+
+      const parsedLeaves = parseLeaveNames(leavesData.staff);
+      const leaveNames = parsedLeaves.map(l => l.name);
+
       const doubleBookingConflicts = checkConflicts(boothsData);
 
       const currentMetadata = schedulesMetadata[selectedDate];
@@ -739,7 +765,7 @@
                     {isEditMode ? (
                       <input
                         type="text"
-                        placeholder="例: 片山, 遠藤"
+                        placeholder="例: 片山, 遠藤(AM), 猪股(午後)"
                         value={leavesData.staff}
                         onChange={(e) => handleInputChange(0, e.target.value)}
                         className="w-full p-2 border-2 border-rose-300 rounded-md outline-none focus:border-rose-500 transition-all font-medium text-sm bg-rose-50/30"
@@ -779,6 +805,7 @@
                   </div>
 
                   <div className="flex flex-col">
+                    {}
                     {boothsData.map((item, localIndex) => {
                       const dataIndex = localIndex + 1;
                       
@@ -789,14 +816,26 @@
                       const currentStaff = item.staff;
                       const changed = isNewBooth || defaultStaff !== currentStaff;
                       
-                      const conflictNames = leaveNames.filter(name => currentStaff.includes(name));
-                      const hasLeaveConflict = conflictNames.length > 0;
+                      // Extract names from the current booth
+                      const currentBoothNames = currentStaff.split(/[\s,、・]+|or/).map(n => n.replace(/[（\(].*?[）\)]/g, '').trim()).filter(n => n.length > 0);
+                      const currentBoothPeriod = getPeriod(item.role);
+
+                      // Find conflicts specifically considering AM/PM leaves
+                      const conflictLeavesForThisBooth = parsedLeaves.filter(leave => {
+                         if (!currentBoothNames.includes(leave.name)) return false;
+                         // Conflict occurs if leave is ALL day, or if the leave period matches the booth's period
+                         return leave.leavePeriod === 'ALL' || leave.leavePeriod === currentBoothPeriod;
+                      });
+
+                      const hasLeaveConflict = conflictLeavesForThisBooth.length > 0;
+                      const conflictNames = conflictLeavesForThisBooth.map(l => l.name);
+
                       const doubleBookings = doubleBookingConflicts[localIndex];
                       const hasDoubleBooking = doubleBookings && doubleBookings.length > 0;
                       
                       let egd2Error = null;
                       if (item.role === 'EGD②' && [2, 3, 4].includes(currentDayOfWeek) && currentStaff) {
-                        const names = currentStaff.split(/[\s,、・]+|or/).map(n => n.trim()).filter(n => n.length > 0 && n !== 'なし');
+                        const names = currentStaff.split(/[\s,、・]+|or/).map(n => n.replace(/[（\(](?!潤[）\)]).*?[）\)]/g, '').trim()).filter(n => n.length > 0 && n !== 'なし' && !/^[✕☓×✗xX]+$/.test(n));
                         const invalidNames = names.filter(n => !VALID_EGD2_STAFF.includes(n));
                         if (invalidNames.length > 0) {
                           egd2Error = `検診枠です。検診登録医の入力をして下さい。(${invalidNames.join(', ')})`;
@@ -1047,3 +1086,4 @@
   </script>
 </body>
 </html>
+
