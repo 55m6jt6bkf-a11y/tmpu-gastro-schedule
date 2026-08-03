@@ -535,7 +535,12 @@
               // 元々ある枠に変更があった場合
               if (currentStaff !== defaultStaff) {
                 isRed = true;
-                cellValue = `旧: ${defaultStaff}\n新: ${currentStaff || '(なし)'}`;
+                if (role === '休暇者') {
+                  // 休暇者の場合は「旧・新」の記載を省き、現在の内容のみ出力
+                  cellValue = currentStaff;
+                } else {
+                  cellValue = `旧: ${defaultStaff}\n新: ${currentStaff || '(なし)'}`;
+                }
               }
             }
             
