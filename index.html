@@ -15,8 +15,8 @@
   <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   
-  <!-- SheetJS (Excel出力用) -->
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <!-- SheetJS (Excel出力用・スタイル適用のため xlsx-js-style に変更) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 
   <style>
     .hide-scrollbar::-webkit-scrollbar { display: none; }
@@ -453,31 +453,107 @@
         setIsEditMode(false);
       };
 
+      // Excel出力
       const handleExportExcel = () => {
         const week = weeksData.find(w => w.id === selectedWeek);
         const dates = week.dates;
-        const weekSchedules = dates.map(d => pendingChanges[d] || schedules[d] || defaultSchedules[d]);
         
+        // その週に存在する全てのユニークな役割(ブース)を抽出
         const allRoles = [];
-        weekSchedules.forEach(dayData => {
+        dates.forEach(d => {
+          const dayData = pendingChanges[d] || schedules[d] || defaultSchedules[d];
           dayData.forEach(item => {
             if (!allRoles.includes(item.role)) allRoles.push(item.role);
           });
         });
 
-        const header = ['役割', ...dates.map((d) => `${d.split('-')[1]}/${d.split('-')[2]}${getDayName(d)}`)];
+        // 行1: ヘッダー (縦に日付、横にブース)
+        const header = ['日付', ...allRoles];
         const data = [header];
+        
+        // 列幅の初期設定
+        const colWidths = [{ wch: 12 }]; // 日付列の幅
+        allRoles.forEach((role) => {
+          colWidths.push({ wch: Math.max(10, role.length * 2) }); // ブース名から初期幅を計算
+        });
 
-        allRoles.forEach(role => {
-          const row = [role];
-          weekSchedules.forEach(dayData => {
-            const item = dayData.find(d => d.role === role);
-            row.push(item ? item.staff : '');
+        // 行2以降: 各日付のデータ
+        dates.forEach(d => {
+          const rowData = pendingChanges[d] || schedules[d] || defaultSchedules[d];
+          const defaultData = defaultSchedules[d] || [];
+          
+          const row = [ `${d.split('-')[1]}/${d.split('-')[2]}${getDayName(d)}` ];
+          
+          allRoles.forEach((role, i) => {
+            const currentItem = rowData.find(item => item.role === role);
+            const defaultItem = defaultData.find(item => item.role === role);
+            
+            const currentStaff = currentItem ? currentItem.staff : '';
+            const defaultStaff = defaultItem ? defaultItem.staff : null;
+            
+            const isNewBooth = defaultStaff === null;
+            const changed = isNewBooth || defaultStaff !== currentStaff;
+            
+            let cellValue = currentStaff;
+            let isRed = false;
+
+            // 変更がある場合はテキストと色を変える
+            if (changed) {
+              isRed = true;
+              if (isNewBooth) {
+                cellValue = `【追加枠】\n${currentStaff}`;
+              } else {
+                cellValue = `旧: ${defaultStaff}\n新: ${currentStaff}`;
+              }
+            }
+            
+            // 最大文字数から列幅を調整 (全角を2文字換算)
+            const lines = cellValue.split('\n');
+            const maxLineLen = Math.max(...lines.map(l => l.replace(/[^\x01-\x7E]/g, 'xx').length));
+            const estWidth = maxLineLen + 2; 
+            if (estWidth > colWidths[i + 1].wch) {
+               colWidths[i + 1].wch = Math.min(estWidth, 30); // 幅が広がりすぎないよう最大30に制限
+            }
+
+            // セルオブジェクトの生成 (スタイル付き)
+            if (isRed) {
+              row.push({
+                v: cellValue,
+                t: 's',
+                s: {
+                  font: { color: { rgb: "FF0000" }, bold: true }, // 赤字・太字
+                  alignment: { wrapText: true, vertical: "center" } // 折り返し
+                }
+              });
+            } else {
+               row.push({
+                v: cellValue,
+                t: 's',
+                s: {
+                  alignment: { wrapText: true, vertical: "center" }
+                }
+              });
+            }
           });
           data.push(row);
         });
 
+        // ヘッダー行のスタイル適用
+        const headerRow = data[0].map(h => ({
+            v: h,
+            t: 's',
+            s: {
+                font: { bold: true },
+                fill: { fgColor: { rgb: "E2E8F0" } }, // グレーの背景
+                alignment: { horizontal: "center", vertical: "center" },
+                border: { bottom: { style: "thin", color: { rgb: "94A3B8" } } }
+            }
+        }));
+        data[0] = headerRow;
+
         const ws = XLSX.utils.aoa_to_sheet(data);
+        ws['!cols'] = colWidths; // 計算した列幅を適用
+
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "スケジュール");
         XLSX.writeFile(wb, `業務変更表_${dates[0].replace(/-/g, '')}.xlsx`);
@@ -944,5 +1020,4 @@
   </script>
 </body>
 </html>
-
 
