@@ -981,12 +981,12 @@
                         const isNewBooth = !defaultItem && item;
                         
                         let cellClass = 'p-2 text-center border-r border-slate-200 font-medium text-sm align-middle leading-snug ';
-                        if (role === '休暇者') {
-                          cellClass += 'text-slate-700 font-bold';
-                        } else if (isNewBooth) {
+                        if (isNewBooth) {
                           cellClass += 'bg-fuchsia-50/80 text-fuchsia-800 font-bold';
                         } else if (isChanged) {
                           cellClass += 'bg-amber-50/80 text-red-700 font-bold';
+                        } else if (role === '休暇者') {
+                          cellClass += 'text-slate-700 font-bold';
                         } else {
                           cellClass += 'text-slate-800';
                         }
@@ -994,7 +994,7 @@
                         return (
                           <td key={d} className={cellClass}>
                             {staff ? formatStaffNameForWeekView(staff) : <span className="text-slate-300">-</span>}
-                            {isChanged && !isNewBooth && role !== '休暇者' && (
+                            {isChanged && !isNewBooth && defaultStaff && (
                               <div className="text-[9px] text-slate-400 mt-0.5 font-normal line-through break-keep">
                                 {defaultStaff}
                               </div>
@@ -1637,4 +1637,5 @@
   </script>
 </body>
 </html>
+
 
