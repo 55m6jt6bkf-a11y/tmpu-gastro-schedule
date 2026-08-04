@@ -15,7 +15,7 @@
   <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   
-  <!-- ExcelJS & FileSaver (背景色やリッチテキスト出力用) -->
+  <!-- ExcelJS & FileSaver -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
@@ -73,6 +73,8 @@
     const db = getFirestore(app);
     const COLLECTION_NAME = 'schedules'; 
     const APP_ID = 'gastro-schedule';
+
+    const ALLOWED_ONCALL_ROLES = ['EGD①', 'EGD②', 'EGD③', 'EUS', 'CS①', 'CS②', '午後CS', '専攻医AUS', 'back up', '上部EUS'];
 
     const monthlyPatterns = [
       // 第1週
@@ -211,6 +213,17 @@
     };
     const defaultSchedules = generateDefaultSchedules();
 
+    const generateDefaultOnCalls = () => {
+      const result = {};
+      weeksData.forEach(week => {
+        week.dates.forEach(d => {
+          result[d] = { first: '', second: '' };
+        });
+      });
+      return result;
+    };
+    const defaultOnCalls = generateDefaultOnCalls();
+
     const PUBLIC_HOLIDAYS = ['2026-08-11', '2026-09-21', '2026-09-22', '2026-09-23', '2026-10-12'];
     const defaultHolidays = {};
     weeksData.forEach(week => {
@@ -234,7 +247,6 @@
       return 'bg-white text-slate-700 border-slate-300';
     };
 
-    // Excel出力用の背景色・文字色を取得する関数 (ARGB形式)
     const getRoleExcelStyle = (role, isNewBooth = false) => {
       let bgColor = 'FFFFFFFF'; // white
       let fontColor = 'FF000000'; // black
@@ -242,7 +254,7 @@
       if (role === '休暇者') {
         bgColor = 'FFFFE4E6'; // rose-100
       } else if (isNewBooth) {
-        bgColor = 'FFFAEAFF'; // fuchsia-100 近似色
+        bgColor = 'FFFAEAFF'; // fuchsia-100
       } else {
         const externals = ['若林', '女川', '涌谷', '一番町', '健診', '刈田', '真壁', '矢本', '渡辺', '佐藤', 'ゆう', '高砂', '循環器', '葵会', '米谷'];
         if (externals.some(kw => role.includes(kw))) {
@@ -259,7 +271,7 @@
           bgColor = 'FFFDF2F8'; // pink-50
         } else if (role.includes('back up')) {
           bgColor = 'FF334155'; // slate-700
-          fontColor = 'FFFFFFFF'; // white (白抜き)
+          fontColor = 'FFFFFFFF'; // white
         }
       }
       return { bgColor, fontColor };
@@ -311,10 +323,56 @@
       return conflicts;
     };
 
+    const checkOnCallConflicts = (onCallName, boothsData) => {
+      if (!onCallName) return null;
+      const pureOnCallName = onCallName.trim();
+      if (!pureOnCallName) return null;
+
+      const foundBooths = [];
+      boothsData.forEach(booth => {
+        const names = booth.staff.split(/[\s,、・]+|or/).map(n => n.replace(/[（\(](?!潤[）\)]).*?[）\)]/g, '').trim());
+        if (names.includes(pureOnCallName)) {
+          foundBooths.push(booth.role);
+        }
+      });
+
+      if (foundBooths.length === 0) {
+        return '当日の担当一覧(ブース)に名前がありません';
+      } else {
+        const invalidBooths = foundBooths.filter(role => !ALLOWED_ONCALL_ROLES.includes(role));
+        if (invalidBooths.length > 0) {
+          return `兼任不可の枠 (${invalidBooths.join(', ')}) にアサインされています`;
+        }
+      }
+      return null;
+    };
+
+    const renderStaffWithHighlight = (staffStr, firstCall, secondCall) => {
+      if (!staffStr) return null;
+      const tokens = staffStr.split(/([\s,、・]+|or)/);
+      
+      const fCallPure = firstCall ? firstCall.trim() : null;
+      const sCallPure = secondCall ? secondCall.trim() : null;
+
+      return tokens.map((token, i) => {
+        const pureName = token.replace(/[（\(].*?[）\)]/g, '').trim();
+        if (pureName.length > 0) {
+          if (fCallPure && pureName === fCallPure) {
+            return <span key={i} className="bg-pink-100 text-pink-800 px-1 py-0.5 rounded border border-pink-300 inline-block mx-0.5 shadow-sm">{token}</span>;
+          }
+          if (sCallPure && pureName === sCallPure) {
+            return <span key={i} className="bg-sky-100 text-sky-800 px-1 py-0.5 rounded border border-sky-300 inline-block mx-0.5 shadow-sm">{token}</span>;
+          }
+        }
+        return <React.Fragment key={i}>{token}</React.Fragment>;
+      });
+    };
+
     function App() {
       const [user, setUser] = useState(null);
       const [schedules, setSchedules] = useState(defaultSchedules);
       const [holidays, setHolidays] = useState(defaultHolidays);
+      const [onCalls, setOnCalls] = useState(defaultOnCalls);
       const [schedulesMetadata, setSchedulesMetadata] = useState({});
       
       const [selectedMonth, setSelectedMonth] = useState(8);
@@ -325,6 +383,7 @@
       const [isEditMode, setIsEditMode] = useState(false);
       const [pendingChanges, setPendingChanges] = useState({});
       const [pendingHolidays, setPendingHolidays] = useState({});
+      const [pendingOnCalls, setPendingOnCalls] = useState({});
       
       const [isLoading, setIsLoading] = useState(true);
       const [isSaving, setIsSaving] = useState(false);
@@ -333,7 +392,6 @@
       const [loginError, setLoginError] = useState('');
 
       useEffect(() => {
-        // 現在の日付をもとに、初期表示すべき日付を決定する
         const today = new Date();
         const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
         
@@ -344,13 +402,11 @@
         const allDates = weeksData.flatMap(w => w.dates);
         
         if (allDates.includes(todayStr)) {
-            // 当日がデータに含まれる場合
             initialDate = todayStr;
             const week = weeksData.find(w => w.dates.includes(todayStr));
             initialWeekId = week.id;
             initialMonth = week.month;
         } else {
-            // 当日がデータに含まれない（土日や過去・未来）場合、今日以降で一番近い日を探す
             const futureDates = allDates.filter(d => new Date(d) >= today);
             if (futureDates.length > 0) {
                 initialDate = futureDates[0];
@@ -397,10 +453,12 @@
                 const parsedStaffData = JSON.parse(data.staffData);
                 setSchedules(prev => ({ ...prev, [dateKey]: parsedStaffData }));
                 setHolidays(prev => ({ ...prev, [dateKey]: data.isHoliday !== undefined ? data.isHoliday : defaultHolidays[dateKey] }));
+                setOnCalls(prev => ({ ...prev, [dateKey]: data.onCallData || { first: '', second: '' } }));
                 setSchedulesMetadata(prev => ({ ...prev, [dateKey]: data.updatedAt }));
               } else {
                 setSchedules(prev => ({ ...prev, [dateKey]: defaultSchedules[dateKey] }));
                 setHolidays(prev => ({ ...prev, [dateKey]: defaultHolidays[dateKey] }));
+                setOnCalls(prev => ({ ...prev, [dateKey]: { first: '', second: '' } }));
                 setSchedulesMetadata(prev => ({ ...prev, [dateKey]: null }));
               }
               setIsLoading(false);
@@ -431,6 +489,7 @@
         : JSON.parse(JSON.stringify(schedules[selectedDate] || defaultSchedules[selectedDate]));
 
       const activeIsHoliday = pendingHolidays[selectedDate] !== undefined ? pendingHolidays[selectedDate] : holidays[selectedDate];
+      const activeOnCall = pendingOnCalls[selectedDate] !== undefined ? pendingOnCalls[selectedDate] : onCalls[selectedDate] || { first: '', second: '' };
 
       const updatePendingChanges = (newData) => {
         setPendingChanges(prev => ({ ...prev, [selectedDate]: newData }));
@@ -460,22 +519,33 @@
       const handleHolidayToggle = () => {
         setPendingHolidays(prev => ({ ...prev, [selectedDate]: !activeIsHoliday }));
       };
+      const handleOnCallChange = (type, value) => {
+        setPendingOnCalls(prev => ({
+          ...prev,
+          [selectedDate]: {
+            ...(prev[selectedDate] || activeOnCall),
+            [type]: value
+          }
+        }));
+      };
 
       const handleSave = async () => {
         if (!user) return;
         setIsSaving(true);
         try {
           const schedulesRef = collection(db, 'artifacts', APP_ID, 'public', 'data', COLLECTION_NAME);
-          const changedDates = new Set([...Object.keys(pendingChanges), ...Object.keys(pendingHolidays)]);
+          const changedDates = new Set([...Object.keys(pendingChanges), ...Object.keys(pendingHolidays), ...Object.keys(pendingOnCalls)]);
           
           const promises = Array.from(changedDates).map(dateKey => {
             const docRef = doc(schedulesRef, dateKey);
             const staffData = pendingChanges[dateKey] ? pendingChanges[dateKey] : schedules[dateKey];
             const isHol = pendingHolidays[dateKey] !== undefined ? pendingHolidays[dateKey] : holidays[dateKey];
+            const onCallDataToSave = pendingOnCalls[dateKey] !== undefined ? pendingOnCalls[dateKey] : (onCalls[dateKey] || {first: '', second: ''});
             
             return setDoc(docRef, {
               staffData: JSON.stringify(staffData),
               isHoliday: isHol,
+              onCallData: onCallDataToSave,
               updatedAt: new Date().toISOString(),
               updatedBy: user.uid
             }, { merge: true });
@@ -484,6 +554,7 @@
           await Promise.all(promises);
           setPendingChanges({}); 
           setPendingHolidays({});
+          setPendingOnCalls({});
           setIsEditMode(false);
         } catch (error) {
           console.error("Error saving document: ", error);
@@ -494,11 +565,12 @@
       };
 
       const handleCancel = () => {
-        if (Object.keys(pendingChanges).length > 0 || Object.keys(pendingHolidays).length > 0) {
+        if (Object.keys(pendingChanges).length > 0 || Object.keys(pendingHolidays).length > 0 || Object.keys(pendingOnCalls).length > 0) {
           if (!confirm('変更内容が破棄されますがよろしいですか？')) return;
         }
         setPendingChanges({});
         setPendingHolidays({});
+        setPendingOnCalls({});
         setIsEditMode(false);
       };
 
@@ -511,7 +583,6 @@
         return len;
       };
 
-      // ExcelJSを利用した出力処理
       const handleExportExcel = async (type = 'week') => {
         let dates = [];
         let fileName = "";
@@ -529,8 +600,8 @@
         const exportSchedules = dates.map(d => pendingChanges[d] || schedules[d] || defaultSchedules[d]);
         const exportDefaultSchedules = dates.map(d => defaultSchedules[d]);
         const exportHolidays = dates.map(d => pendingHolidays[d] !== undefined ? pendingHolidays[d] : holidays[d]);
+        const exportOnCalls = dates.map(d => pendingOnCalls[d] !== undefined ? pendingOnCalls[d] : (onCalls[d] || {first: '', second: ''}));
         
-        // 元データの「役割」の順序を抽出
         const allRolesObj = {}; 
         exportSchedules.forEach((dayData, index) => {
           if (!exportHolidays[index]) {
@@ -553,18 +624,17 @@
           return allRolesObj[a] - allRolesObj[b];
         });
 
-        // ワークブック・シート作成
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet("スケジュール");
 
-        // 列の設定 (ヘッダー文字数から初期幅を計算)
         const columns = [
           { header: '日付', key: 'date', width: 12 },
+          { header: '1st Call', key: 'firstCall', width: 12 },
+          { header: '2nd Call', key: 'secondCall', width: 12 },
           ...allRoles.map(role => ({ header: role, key: role, width: Math.max(getStrWidth(role) + 4, 12) }))
         ];
         worksheet.columns = columns;
 
-        // ヘッダー行の装飾
         const headerRow = worksheet.getRow(1);
         headerRow.eachCell((cell) => {
           cell.font = { bold: true };
@@ -577,16 +647,35 @@
           const row = worksheet.addRow({});
           const dateStr = `${d.split('-')[1]}/${d.split('-')[2]}${getDayName(d)}`;
           
-          // 日付セル
           const dateCell = row.getCell(1);
           dateCell.value = dateStr;
           dateCell.alignment = { vertical: 'middle', horizontal: 'center' };
           dateCell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
 
           const isHol = exportHolidays[i];
+          const currentOnCall = exportOnCalls[i];
+
+          // 1st Call / 2nd Call
+          const firstCallCell = row.getCell(2);
+          firstCallCell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+          firstCallCell.alignment = { vertical: 'middle', horizontal: 'center' };
+          if (!isHol && currentOnCall.first) {
+             firstCallCell.value = currentOnCall.first;
+             firstCallCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFCE7F3' } }; // pink-100
+             firstCallCell.font = { color: { argb: 'FF9D174D' }, bold: true }; // pink-800
+          }
+
+          const secondCallCell = row.getCell(3);
+          secondCallCell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+          secondCallCell.alignment = { vertical: 'middle', horizontal: 'center' };
+          if (!isHol && currentOnCall.second) {
+             secondCallCell.value = currentOnCall.second;
+             secondCallCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } }; // sky-100
+             secondCallCell.font = { color: { argb: 'FF0369A1' }, bold: true }; // sky-800
+          }
 
           allRoles.forEach((role, colIndex) => {
-            const cell = row.getCell(colIndex + 2);
+            const cell = row.getCell(colIndex + 4);
             cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
             cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
 
@@ -609,12 +698,11 @@
             const defaultStaff = defaultItem ? defaultItem.staff : "";
             const isNewBooth = !defaultItem && currentItem;
 
-            // 役割に応じた背景色と基本文字色の取得
             const { bgColor, fontColor } = getRoleExcelStyle(role, isNewBooth);
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
 
             if (!currentItem && !defaultItem) {
-               return; // 空の枠
+               return; 
             }
             
             if (role === '休暇者') {
@@ -633,7 +721,6 @@
                   ]
               };
             } else if (currentStaff !== defaultStaff) {
-              // 旧(基本)は黒または白、新(変更後)は赤にするリッチテキスト設定
               cell.value = {
                   richText: [
                       { font: { color: { argb: fontColor } }, text: `旧: ${defaultStaff}\n` },
@@ -645,16 +732,14 @@
               cell.font = { color: { argb: fontColor } };
             }
 
-            // コンテンツに応じた列幅の自動調整（簡易）
-            const currentWidth = worksheet.getColumn(colIndex + 2).width;
+            const currentWidth = worksheet.getColumn(colIndex + 4).width;
             const contentWidth = getStrWidth(currentStaff) + (currentStaff !== defaultStaff ? 4 : 0);
             if (contentWidth > currentWidth) {
-                worksheet.getColumn(colIndex + 2).width = Math.min(contentWidth + 2, 30); // 最大幅を30程度に抑える
+                worksheet.getColumn(colIndex + 4).width = Math.min(contentWidth + 2, 30);
             }
           });
         });
 
-        // ワークブックをBlobとして書き出しダウンロード
         const buffer = await workbook.xlsx.writeBuffer();
         const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         saveAs(blob, fileName);
@@ -686,9 +771,7 @@
       const currentWeekData = weeksData.find(w => w.id === selectedWeek);
       const leavesData = activeData[0] || { role: '休暇者', staff: '' };
       const boothsData = activeData.slice(1);
-      const defaultBoothsData = defaultSchedules[selectedDate].slice(1);
 
-      // Parse leave names with optional period restrictions (AM/PM/午前/午後)
       const parseLeaveNames = (leaveStr) => {
         const leaves = [];
         const entries = leaveStr.split(/[\s,、・]+|or/).filter(e => e.trim().length > 0);
@@ -714,11 +797,11 @@
       };
 
       const parsedLeaves = parseLeaveNames(leavesData.staff);
-      const leaveNames = parsedLeaves.map(l => l.name);
-
       const doubleBookingConflicts = checkConflicts(boothsData);
 
-      // 全データを通した最終更新日時の計算
+      const firstCallError = checkOnCallConflicts(activeOnCall.first, boothsData);
+      const secondCallError = checkOnCallConflicts(activeOnCall.second, boothsData);
+
       let latestUpdate = null;
       Object.values(schedulesMetadata).forEach(dateStr => {
         if (dateStr) {
@@ -733,7 +816,7 @@
         ? latestUpdate.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
         : '未更新';
 
-      const changedDatesSet = new Set([...Object.keys(pendingChanges), ...Object.keys(pendingHolidays)]);
+      const changedDatesSet = new Set([...Object.keys(pendingChanges), ...Object.keys(pendingHolidays), ...Object.keys(pendingOnCalls)]);
       const changedDaysCount = changedDatesSet.size;
       
       const currentDayOfWeek = new Date(selectedDate).getDay();
@@ -754,7 +837,7 @@
                   <span>最終更新: {updatedAtStr}</span>
                 </div>
                 {isAdmin ? (
-                  <button onClick={() => { setIsAdmin(false); setIsEditMode(false); setPendingChanges({}); setPendingHolidays({}); }} className="flex items-center gap-1.5 text-xs bg-blue-900 hover:bg-blue-700 px-3 py-1.5 rounded-md transition-colors border border-blue-700">
+                  <button onClick={() => { setIsAdmin(false); setIsEditMode(false); setPendingChanges({}); setPendingHolidays({}); setPendingOnCalls({}); }} className="flex items-center gap-1.5 text-xs bg-blue-900 hover:bg-blue-700 px-3 py-1.5 rounded-md transition-colors border border-blue-700">
                     <IconLogOut className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">ログアウト</span>
                   </button>
@@ -825,7 +908,7 @@
                 {currentWeekData.dates.map((dateStr) => {
                   const [, month, day] = dateStr.split('-');
                   const isSelected = selectedDate === dateStr;
-                  const hasChanges = pendingChanges[dateStr] !== undefined || pendingHolidays[dateStr] !== undefined;
+                  const hasChanges = pendingChanges[dateStr] !== undefined || pendingHolidays[dateStr] !== undefined || pendingOnCalls[dateStr] !== undefined;
                   const isHol = pendingHolidays[dateStr] !== undefined ? pendingHolidays[dateStr] : holidays[dateStr];
                   
                   return (
@@ -877,11 +960,10 @@
               </div>
             ) : (
               <>
-                <div className="bg-white rounded-lg shadow-sm border-2 border-rose-200 overflow-hidden mb-4">
+                <div className="bg-white rounded-lg shadow-sm border-2 border-rose-200 overflow-hidden mb-3">
                   <div className="bg-rose-50 border-b border-rose-200 px-4 py-2.5 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="bg-rose-100 text-rose-800 text-xs px-2 py-1 rounded border border-rose-300 font-bold">休暇者</span>
-                      <span className="text-xs text-rose-600 font-medium">※カンマやスペース区切りで入力</span>
                     </div>
                   </div>
                   <div className="p-3">
@@ -896,6 +978,60 @@
                     ) : (
                       <div className="text-sm font-bold text-slate-800 min-h-[1.5rem] flex items-center">
                         {leavesData.staff || <span className="text-slate-400 font-normal">（なし）</span>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow-sm border-2 border-indigo-200 overflow-hidden mb-5">
+                  <div className="bg-indigo-50 border-b border-indigo-200 px-4 py-2 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded border border-indigo-300 font-bold flex items-center gap-1">
+                        <IconAlertCircle className="w-3.5 h-3.5" /> 日中当番
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-indigo-50/10">
+                    {isEditMode ? (
+                      <div className="flex flex-col gap-2.5">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold w-16 text-pink-600 bg-pink-50 text-center py-1 rounded border border-pink-200">1st Call</span>
+                            <input
+                              type="text"
+                              placeholder="例: 山田"
+                              value={activeOnCall.first}
+                              onChange={(e) => handleOnCallChange('first', e.target.value)}
+                              className="flex-1 p-1.5 border-2 border-slate-200 rounded outline-none focus:border-pink-400 transition-colors text-sm font-bold"
+                            />
+                          </div>
+                          {firstCallError && <p className="text-[10px] text-red-600 mt-1 ml-[72px] font-bold">{firstCallError}</p>}
+                        </div>
+                        
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold w-16 text-sky-600 bg-sky-50 text-center py-1 rounded border border-sky-200">2nd Call</span>
+                            <input
+                              type="text"
+                              placeholder="例: 佐藤"
+                              value={activeOnCall.second}
+                              onChange={(e) => handleOnCallChange('second', e.target.value)}
+                              className="flex-1 p-1.5 border-2 border-slate-200 rounded outline-none focus:border-sky-400 transition-colors text-sm font-bold"
+                            />
+                          </div>
+                          {secondCallError && <p className="text-[10px] text-red-600 mt-1 ml-[72px] font-bold">{secondCallError}</p>}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm font-bold text-slate-800 flex flex-wrap gap-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-pink-700 border border-pink-300 bg-pink-100 px-1.5 py-0.5 rounded shadow-sm">1st Call</span>
+                          <span className="text-base">{activeOnCall.first || <span className="text-slate-400 text-sm font-normal">（未設定）</span>}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-sky-700 border border-sky-300 bg-sky-100 px-1.5 py-0.5 rounded shadow-sm">2nd Call</span>
+                          <span className="text-base">{activeOnCall.second || <span className="text-slate-400 text-sm font-normal">（未設定）</span>}</span>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -939,11 +1075,9 @@
                       const currentStaff = item.staff;
                       const changed = isNewBooth || defaultStaff !== currentStaff;
                       
-                      // Extract names from the current booth
                       const currentBoothNames = currentStaff.split(/[\s,、・]+|or/).map(n => n.replace(/[（\(].*?[）\)]/g, '').trim()).filter(n => n.length > 0);
                       const currentBoothPeriod = getPeriod(item.role);
 
-                      // Find conflicts specifically considering AM/PM leaves
                       const conflictLeavesForThisBooth = parsedLeaves.filter(leave => {
                          if (!currentBoothNames.includes(leave.name)) return false;
                          return leave.leavePeriod === 'ALL' || leave.leavePeriod === currentBoothPeriod;
@@ -1055,12 +1189,12 @@
                                       <span className={`text-base sm:text-lg font-black drop-shadow-sm ${
                                         isError ? 'text-red-700' : isNewBooth ? 'text-fuchsia-700' : 'text-red-600'
                                       }`}>
-                                        {currentStaff || <span className="text-slate-300 text-sm font-normal">（未設定）</span>}
+                                        {currentStaff ? renderStaffWithHighlight(currentStaff, activeOnCall.first, activeOnCall.second) : <span className="text-slate-300 text-sm font-normal">（未設定）</span>}
                                       </span>
                                     </>
                                   ) : (
-                                    <span className={`text-sm font-bold ${isError ? 'text-red-700' : 'text-slate-800'}`}>
-                                      {currentStaff}
+                                    <span className={`text-base sm:text-lg font-black drop-shadow-sm ${isError ? 'text-red-700' : 'text-slate-800'}`}>
+                                      {currentStaff ? renderStaffWithHighlight(currentStaff, activeOnCall.first, activeOnCall.second) : null}
                                     </span>
                                   )}
                                   
