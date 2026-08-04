@@ -77,6 +77,21 @@
 
     const ALLOWED_ONCALL_ROLES = ['EGD①', 'EGD②', 'EGD③', 'EUS', 'CS①', 'CS②', '午後CS', '専攻医AUS', 'back up', '上部EUS'];
 
+    const MASTER_ROLE_ORDER = [
+      '休暇者',
+      '新患①', '新患②', '新患③', '新患④',
+      'EGD①', 'EGD②', 'EGD③',
+      'EUS', '上部EUS',
+      'CS①', 'CS②', '透視CS', '午後CS',
+      '専攻医AUS',
+      'back up',
+      '若林EGD', '仙台健診', '一番町', '涌谷', '若林CS',
+      '刈田病院', '真壁病院', '矢本内科',
+      '健診プラザ', '渡辺病院', '佐藤胃腸外科', 'ゆうファミリー',
+      '女川EGD&CS', '高砂内科', '循環器センター',
+      '葵会EGD', '米谷病院'
+    ];
+
     const monthlyPatterns = [
       // 第1週
       [
@@ -624,8 +639,11 @@
         });
         
         const allRoles = Object.keys(allRolesObj).sort((a, b) => {
-          if (a === '休暇者') return -1;
-          if (b === '休暇者') return 1;
+          const indexA = MASTER_ROLE_ORDER.indexOf(a);
+          const indexB = MASTER_ROLE_ORDER.indexOf(b);
+          if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+          if (indexA !== -1) return -1;
+          if (indexB !== -1) return 1;
           return allRolesObj[a] - allRolesObj[b];
         });
 
@@ -846,8 +864,11 @@
         });
 
         const allRoles = Object.keys(allRolesObj).sort((a, b) => {
-          if (a === '休暇者') return -1;
-          if (b === '休暇者') return 1;
+          const indexA = MASTER_ROLE_ORDER.indexOf(a);
+          const indexB = MASTER_ROLE_ORDER.indexOf(b);
+          if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+          if (indexA !== -1) return -1;
+          if (indexB !== -1) return 1;
           return allRolesObj[a] - allRolesObj[b];
         });
 
