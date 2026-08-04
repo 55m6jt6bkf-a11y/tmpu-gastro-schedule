@@ -851,6 +851,18 @@
         const weekOnCalls = weekDates.map(d => pendingOnCalls[d] !== undefined ? pendingOnCalls[d] : (onCalls[d] || {first: '', second: ''}));
         const weekDefaultSchedules = weekDates.map(d => defaultSchedules[d]);
 
+        const formatStaffNameForWeekView = (staffStr) => {
+          if (!staffStr) return null;
+          const parts = staffStr.split(/(・|or|、|\s+)/);
+          return parts.map((part, index) => {
+            if (!part) return null;
+            if (['・', 'or', '、'].includes(part) || part.trim() === '') {
+              return <span key={index}>{part}</span>;
+            }
+            return <span key={index} className="inline-block">{part}</span>;
+          });
+        };
+
         const allRolesObj = {};
         weekSchedules.forEach((dayData, index) => {
           if (!weekHolidays[index] && dayData) {
@@ -897,19 +909,25 @@
               <tbody>
                 {/* 1st Call */}
                 <tr className="border-b border-slate-200 bg-pink-50/40 hover:bg-pink-100/50 transition-colors">
-                  <td className="p-2 font-bold sticky left-0 z-10 bg-pink-50 border-r border-slate-300 text-pink-800 text-xs text-center shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">1st Call</td>
+                  <td className="p-2 font-bold sticky left-0 z-10 bg-pink-50 border-r border-slate-300 text-pink-800 text-center shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                    <div className="text-[9px] font-bold text-pink-600 mb-0.5 whitespace-nowrap">日中当番</div>
+                    <div className="text-xs">1st Call</div>
+                  </td>
                   {weekDates.map((d, i) => (
                     <td key={d} className="p-2 text-center border-r border-slate-200 last:border-r-0 font-bold text-pink-900">
-                      {weekHolidays[i] ? <span className="text-rose-300">-</span> : weekOnCalls[i]?.first || <span className="text-slate-300">-</span>}
+                      {weekHolidays[i] ? <span className="text-rose-300">-</span> : (weekOnCalls[i]?.first ? formatStaffNameForWeekView(weekOnCalls[i].first) : <span className="text-slate-300">-</span>)}
                     </td>
                   ))}
                 </tr>
                 {/* 2nd Call */}
                 <tr className="border-b border-slate-300 bg-sky-50/40 hover:bg-sky-100/50 transition-colors">
-                  <td className="p-2 font-bold sticky left-0 z-10 bg-sky-50 border-r border-slate-300 text-sky-800 text-xs text-center shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">2nd Call</td>
+                  <td className="p-2 font-bold sticky left-0 z-10 bg-sky-50 border-r border-slate-300 text-sky-800 text-center shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                    <div className="text-[9px] font-bold text-sky-600 mb-0.5 whitespace-nowrap">日中当番</div>
+                    <div className="text-xs">2nd Call</div>
+                  </td>
                   {weekDates.map((d, i) => (
                     <td key={d} className="p-2 text-center border-r border-slate-200 last:border-r-0 font-bold text-sky-900">
-                      {weekHolidays[i] ? <span className="text-rose-300">-</span> : weekOnCalls[i]?.second || <span className="text-slate-300">-</span>}
+                      {weekHolidays[i] ? <span className="text-rose-300">-</span> : (weekOnCalls[i]?.second ? formatStaffNameForWeekView(weekOnCalls[i].second) : <span className="text-slate-300">-</span>)}
                     </td>
                   ))}
                 </tr>
@@ -955,9 +973,9 @@
 
                         return (
                           <td key={d} className={cellClass}>
-                            {staff || <span className="text-slate-300">-</span>}
+                            {staff ? formatStaffNameForWeekView(staff) : <span className="text-slate-300">-</span>}
                             {isChanged && !isNewBooth && role !== '休暇者' && (
-                              <div className="text-[9px] text-slate-400 mt-0.5 font-normal line-through">
+                              <div className="text-[9px] text-slate-400 mt-0.5 font-normal line-through break-keep">
                                 {defaultStaff}
                               </div>
                             )}
