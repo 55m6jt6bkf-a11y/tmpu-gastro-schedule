@@ -371,7 +371,7 @@
       const sCallPure = secondCall ? secondCall.trim() : null;
 
       return tokens.map((token, i) => {
-        const pureName = token.replace(/[（\(].*?[）\)]/g, '').trim();
+        const pureName = token.replace(/[（\(](?!潤[）\)]).*?[）\)]/g, '').trim();
         if (pureName.length > 0) {
           if (fCallPure && pureName === fCallPure) {
             return <span key={i} className="bg-pink-100 text-pink-800 px-1 py-0.5 rounded border border-pink-300 inline-block mx-0.5 shadow-sm">{token}</span>;
@@ -1268,7 +1268,7 @@
                       const currentStaff = item.staff;
                       const changed = isNewBooth || defaultStaff !== currentStaff;
                       
-                      const currentBoothNames = currentStaff.split(/[\s,、・]+|or/).map(n => n.replace(/[（\(].*?[）\)]/g, '').trim()).filter(n => n.length > 0);
+                      const currentBoothNames = currentStaff.split(/[\s,、・]+|or/).map(n => n.replace(/[（\(](?!潤[）\)]).*?[）\)]/g, '').trim()).filter(n => n.length > 0);
                       const currentBoothPeriod = getPeriod(item.role);
 
                       const conflictLeavesForThisBooth = parsedLeaves.filter(leave => {
