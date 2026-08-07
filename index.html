@@ -680,30 +680,50 @@
         const exportHolidays = dates.map(d => pendingHolidays[d] !== undefined ? pendingHolidays[d] : holidays[d]);
         const exportOnCalls = dates.map(d => pendingOnCalls[d] !== undefined ? pendingOnCalls[d] : (onCalls[d] || {first: '', second: ''}));
         
-        const allRolesObj = {}; 
-        exportSchedules.forEach((dayData, index) => {
-          if (!exportHolidays[index]) {
-             exportDefaultSchedules[index].forEach((item, idx) => {
-                if (allRolesObj[item.role] === undefined) {
-                   allRolesObj[item.role] = idx;
-                }
-             });
-             dayData.forEach(item => {
-                if (allRolesObj[item.role] === undefined) {
-                   allRolesObj[item.role] = 999;
-                }
-             });
+        // --- ブースの並び順を日別表示（変更された配列）に合わせて計算 ---
+        const roleAvgIndex = {};
+        const allRolesSet = new Set();
+
+        exportSchedules.forEach((dayData, i) => {
+          if (!exportHolidays[i] && dayData) {
+            dayData.forEach((item, idx) => {
+              allRolesSet.add(item.role);
+              if (!roleAvgIndex[item.role]) roleAvgIndex[item.role] = { sum: 0, count: 0 };
+              roleAvgIndex[item.role].sum += idx;
+              roleAvgIndex[item.role].count += 1;
+            });
           }
         });
-        
-        const allRoles = Object.keys(allRolesObj).sort((a, b) => {
+
+        // 休日等で変更データに含まれていない場合のためにデフォルトからもインデックスを収集
+        exportDefaultSchedules.forEach((dayData, i) => {
+          if (dayData) {
+            dayData.forEach((item, idx) => {
+              allRolesSet.add(item.role);
+              if (!roleAvgIndex[item.role]) {
+                roleAvgIndex[item.role] = { sum: idx, count: 1 };
+              }
+            });
+          }
+        });
+
+        const allRoles = Array.from(allRolesSet).sort((a, b) => {
+          if (a === '休暇者') return -1;
+          if (b === '休暇者') return 1;
+          
+          const avgA = roleAvgIndex[a] ? (roleAvgIndex[a].sum / roleAvgIndex[a].count) : 999;
+          const avgB = roleAvgIndex[b] ? (roleAvgIndex[b].sum / roleAvgIndex[b].count) : 999;
+          
+          if (avgA !== avgB) return avgA - avgB;
+          
           const indexA = MASTER_ROLE_ORDER.indexOf(a);
           const indexB = MASTER_ROLE_ORDER.indexOf(b);
           if (indexA !== -1 && indexB !== -1) return indexA - indexB;
           if (indexA !== -1) return -1;
           if (indexB !== -1) return 1;
-          return allRolesObj[a] - allRolesObj[b];
+          return a.localeCompare(b);
         });
+        // -----------------------------------------------------------------
 
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet("スケジュール");
@@ -921,26 +941,59 @@
           });
         };
 
-        const allRolesObj = {};
-        weekSchedules.forEach((dayData, index) => {
-          if (!weekHolidays[index] && dayData) {
-            weekDefaultSchedules[index].forEach((item, idx) => {
-              if (allRolesObj[item.role] === undefined) allRolesObj[item.role] = idx;
-            });
-            dayData.forEach((item) => {
-              if (allRolesObj[item.role] === undefined) allRolesObj[item.role] = 999;
+        // --- ブースの並び順を日別表示（変更された配列）に合わせて計算 ---
+        const roleAvgIndex = {};
+        const allRolesSet = new Set();
+        
+        weekSchedules.forEach((dayData, dayIdx) => {
+          if (!weekHolidays[dayIdx] && dayData) {
+            dayData.forEach((item, itemIdx) => {
+              allRolesSet.add(item.role);
+              if (!roleAvgIndex[item.role]) roleAvgIndex[item.role] = { sum: 0, count: 0 };
+              roleAvgIndex[item.role].sum += itemIdx;
+              roleAvgIndex[item.role].count += 1;
             });
           }
         });
 
-        const allRoles = Object.keys(allRolesObj).sort((a, b) => {
+        // 休日等で変更データに含まれていない場合のためにデフォルトからもインデックスを収集
+        weekDefaultSchedules.forEach((dayData, dayIdx) => {
+           if (dayData) {
+              dayData.forEach((item, itemIdx) => {
+                 allRolesSet.add(item.role);
+                 if (!roleAvgIndex[item.role]) {
+                    roleAvgIndex[item.role] = { sum: itemIdx, count: 1 };
+                 }
+              });
+           }
+        });
+
+        const allRoles = Array.from(allRolesSet).sort((a, b) => {
+          if (a === '休暇者') return -1;
+          if (b === '休暇者') return 1;
+          
+          const avgA = roleAvgIndex[a] ? (roleAvgIndex[a].sum / roleAvgIndex[a].count) : 999;
+          const avgB = roleAvgIndex[b] ? (roleAvgIndex[b].sum / roleAvgIndex[b].count) : 999;
+          
+          if (avgA !== avgB) return avgA - avgB;
+          
+          // 平均インデックスが同じ場合はMASTERの順序、それも同じなら名前順
           const indexA = MASTER_ROLE_ORDER.indexOf(a);
           const indexB = MASTER_ROLE_ORDER.indexOf(b);
           if (indexA !== -1 && indexB !== -1) return indexA - indexB;
           if (indexA !== -1) return -1;
           if (indexB !== -1) return 1;
-          return allRolesObj[a] - allRolesObj[b];
+          return a.localeCompare(b);
         });
+
+        // ある役割が対象週全体で「臨時枠」かどうかを判定する関数
+        const isRoleNewBoothInWeek = (role) => {
+          return weekDefaultSchedules.every(defData => {
+            if (!defData) return true; // デフォルトデータがない日は無視
+            return !defData.some(d => d.role === role);
+          });
+        };
+        // -----------------------------------------------------------------
 
         return (
           <div className="bg-white rounded-lg shadow-sm border border-slate-300 overflow-hidden mb-8 overflow-x-auto">
@@ -992,11 +1045,13 @@
                 
                 {/* allRoles */}
                 {allRoles.map(role => {
+                  const isWeeklyNewBooth = isRoleNewBoothInWeek(role);
                   const rowColorClass = role === '休暇者' ? 'bg-rose-50/20' : 'bg-white hover:bg-slate-50 transition-colors';
                   return (
                     <tr key={role} className={`border-b border-slate-200 last:border-b-0 ${rowColorClass}`}>
                       <td className="p-1.5 sticky left-0 z-10 bg-white border-r border-slate-300 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] align-middle">
-                        <div className={`mx-auto w-full max-w-[90px] px-1 py-1 rounded text-[11px] font-bold border text-center whitespace-normal break-words leading-tight ${getRoleColor(role, false)}`}>
+                        {/* 左端の枠名にも臨時枠の色付けを適用 */}
+                        <div className={`mx-auto w-full max-w-[90px] px-1 py-1 rounded text-[11px] font-bold border text-center whitespace-normal break-words leading-tight ${getRoleColor(role, isWeeklyNewBooth)}`}>
                           {role}
                         </div>
                       </td>
