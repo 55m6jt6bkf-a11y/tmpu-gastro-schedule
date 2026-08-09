@@ -22,6 +22,24 @@
   <style>
     .hide-scrollbar::-webkit-scrollbar { display: none; }
     .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* 印刷用のスタイル調整 */
+    @media print {
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        background-color: white !important;
+        color: black !important;
+      }
+      @page {
+        size: A4 landscape; /* 横向き印刷を推奨 */
+        margin: 10mm;
+      }
+      /* スクロールによる見切れを防止 */
+      .print-overflow-visible {
+        overflow: visible !important;
+      }
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans">
@@ -62,6 +80,7 @@
     const IconArrowUp = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m18 15-6-6-6 6"/></svg>;
     const IconArrowDown = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 9 6 6 6-6"/></svg>;
     const IconMegaphone = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>;
+    const IconPrinter = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>;
 
     // 名前の純粋化: カッコ内に「潤」を含むものは残し、(AM)(午後)などは除去する
     const getPureName = (str) => {
@@ -996,15 +1015,15 @@
         // -----------------------------------------------------------------
 
         return (
-          <div className="bg-white rounded-lg shadow-sm border border-slate-300 overflow-hidden mb-8 overflow-x-auto">
+          <div className="bg-white rounded-lg shadow-sm border border-slate-300 overflow-hidden mb-8 overflow-x-auto print-overflow-visible print:border-none print:shadow-none">
             <table className="w-full text-sm min-w-[700px] border-collapse">
               <thead>
                 <tr className="bg-slate-100 border-b-2 border-slate-300">
-                  <th className="p-2 text-center w-24 sticky left-0 z-20 bg-slate-100 border-r border-slate-300 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">担当・枠</th>
+                  <th className="p-2 text-center w-24 sticky left-0 z-20 bg-slate-100 border-r border-slate-300 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] print:shadow-none print:border-slate-300">担当・枠</th>
                   {weekDates.map((d, i) => (
                     <th 
                       key={d} 
-                      className={`p-2 text-center min-w-[120px] border-r border-slate-200 last:border-r-0 cursor-pointer hover:bg-slate-200 transition-colors ${weekHolidays[i] ? 'text-rose-600' : 'text-slate-700'}`}
+                      className={`p-2 text-center min-w-[120px] border-r border-slate-200 last:border-r-0 cursor-pointer hover:bg-slate-200 transition-colors ${weekHolidays[i] ? 'text-rose-600' : 'text-slate-700'} print:border-slate-300 print:text-black`}
                       onClick={() => {
                         handleDateChange(d);
                         setViewMode('day');
@@ -1020,24 +1039,24 @@
               <tbody>
                 {/* 1st Call */}
                 <tr className="border-b border-slate-200 bg-pink-50/40 hover:bg-pink-100/50 transition-colors">
-                  <td className="p-2 font-bold sticky left-0 z-10 bg-pink-50 border-r border-slate-300 text-pink-800 text-center shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                  <td className="p-2 font-bold sticky left-0 z-10 bg-pink-50 border-r border-slate-300 text-pink-800 text-center shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] print:shadow-none print:border-slate-300">
                     <div className="text-[9px] font-bold text-pink-600 mb-0.5 whitespace-nowrap">日中当番</div>
                     <div className="text-xs">1st Call</div>
                   </td>
                   {weekDates.map((d, i) => (
-                    <td key={d} className="p-2 text-center border-r border-slate-200 last:border-r-0 font-bold text-pink-900">
+                    <td key={d} className="p-2 text-center border-r border-slate-200 last:border-r-0 font-bold text-pink-900 print:border-slate-300">
                       {weekHolidays[i] ? <span className="text-rose-300">-</span> : (weekOnCalls[i]?.first ? formatStaffNameForWeekView(weekOnCalls[i].first) : <span className="text-slate-300">-</span>)}
                     </td>
                   ))}
                 </tr>
                 {/* 2nd Call */}
                 <tr className="border-b border-slate-300 bg-sky-50/40 hover:bg-sky-100/50 transition-colors">
-                  <td className="p-2 font-bold sticky left-0 z-10 bg-sky-50 border-r border-slate-300 text-sky-800 text-center shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                  <td className="p-2 font-bold sticky left-0 z-10 bg-sky-50 border-r border-slate-300 text-sky-800 text-center shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] print:shadow-none print:border-slate-300">
                     <div className="text-[9px] font-bold text-sky-600 mb-0.5 whitespace-nowrap">日中当番</div>
                     <div className="text-xs">2nd Call</div>
                   </td>
                   {weekDates.map((d, i) => (
-                    <td key={d} className="p-2 text-center border-r border-slate-200 last:border-r-0 font-bold text-sky-900">
+                    <td key={d} className="p-2 text-center border-r border-slate-200 last:border-r-0 font-bold text-sky-900 print:border-slate-300">
                       {weekHolidays[i] ? <span className="text-rose-300">-</span> : (weekOnCalls[i]?.second ? formatStaffNameForWeekView(weekOnCalls[i].second) : <span className="text-slate-300">-</span>)}
                     </td>
                   ))}
@@ -1048,8 +1067,8 @@
                   const isWeeklyNewBooth = isRoleNewBoothInWeek(role);
                   const rowColorClass = role === '休暇者' ? 'bg-rose-50/20' : 'bg-white hover:bg-slate-50 transition-colors';
                   return (
-                    <tr key={role} className={`border-b border-slate-200 last:border-b-0 ${rowColorClass}`}>
-                      <td className="p-1.5 sticky left-0 z-10 bg-white border-r border-slate-300 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] align-middle">
+                    <tr key={role} className={`border-b border-slate-200 last:border-b-0 ${rowColorClass} print:border-slate-300`}>
+                      <td className="p-1.5 sticky left-0 z-10 bg-white border-r border-slate-300 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] align-middle print:shadow-none print:border-slate-300">
                         {/* 左端の枠名にも臨時枠の色付けを適用 */}
                         <div className={`mx-auto w-full max-w-[90px] px-1 py-1 rounded text-[11px] font-bold border text-center whitespace-normal break-words leading-tight ${getRoleColor(role, isWeeklyNewBooth)}`}>
                           {role}
@@ -1058,9 +1077,9 @@
                       {weekDates.map((d, i) => {
                         if (weekHolidays[i]) {
                           if (role === '休暇者') {
-                            return <td key={d} className="p-2 text-center border-r border-slate-200 text-rose-500 font-bold bg-rose-50/50 text-xs">休診日</td>;
+                            return <td key={d} className="p-2 text-center border-r border-slate-200 text-rose-500 font-bold bg-rose-50/50 text-xs print:border-slate-300">休診日</td>;
                           }
-                          return <td key={d} className="p-2 text-center border-r border-slate-200 bg-slate-50/50"></td>;
+                          return <td key={d} className="p-2 text-center border-r border-slate-200 bg-slate-50/50 print:border-slate-300"></td>;
                         }
                         
                         const dayData = weekSchedules[i];
@@ -1073,7 +1092,7 @@
                         const isChanged = staff !== defaultStaff;
                         const isNewBooth = !defaultItem && item;
                         
-                        let cellClass = 'p-2 text-center border-r border-slate-200 font-medium text-sm align-middle leading-snug ';
+                        let cellClass = 'p-2 text-center border-r border-slate-200 font-medium text-sm align-middle leading-snug print:border-slate-300 ';
                         if (isNewBooth) {
                           cellClass += 'bg-fuchsia-50/80 text-fuchsia-800 font-bold';
                         } else if (isChanged) {
@@ -1106,7 +1125,7 @@
 
       return (
         <div>
-          <header className="bg-blue-800 text-white p-3 sm:p-4 shadow-md sticky top-0 z-30">
+          <header className="bg-blue-800 text-white p-3 sm:p-4 shadow-md sticky top-0 z-30 print:hidden">
             <div className="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
               <div className="flex items-center gap-2">
                 <IconCalendar className="w-5 h-5 text-blue-200" />
@@ -1134,9 +1153,14 @@
             </div>
           </header>
 
-          <main className="max-w-4xl mx-auto p-3 sm:p-4 pb-28">
+          <main className="max-w-4xl mx-auto p-3 sm:p-4 pb-28 print:p-0">
             
-            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 mb-4 sticky top-[72px] sm:top-[60px] z-20">
+            {/* 印刷時のみ表示されるタイトル */}
+            <div className="hidden print:block text-2xl font-bold mb-6 text-center text-black border-b-2 border-black pb-2">
+              業務変更表 ({selectedMonth}月) - {weeksData.find(w => w.id === selectedWeek)?.label}
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 mb-4 sticky top-[72px] sm:top-[60px] z-20 print:hidden">
               <div className="flex overflow-x-auto gap-2 pb-2 mb-2 border-b border-slate-100 hide-scrollbar">
                 {months.map(month => (
                   <button
@@ -1167,7 +1191,17 @@
                     </button>
                   ))}
                 </div>
+                
+                {/* 印刷・出力ボタン群 */}
                 <div className="flex gap-1.5 shrink-0">
+                  <button
+                    onClick={() => window.print()}
+                    className="flex items-center gap-1 text-xs bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300 px-2 py-1.5 rounded transition-colors font-bold shadow-sm"
+                    title="現在の表示を印刷"
+                  >
+                    <IconPrinter className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">印刷</span>
+                  </button>
                   <button
                     onClick={() => handleExportExcel('week')}
                     className="flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 px-2 py-1.5 rounded transition-colors font-bold shadow-sm"
@@ -1238,7 +1272,7 @@
             </div>
 
             {isAdmin && !isEditMode && (
-              <div className="bg-blue-50/50 rounded-lg border border-blue-200 p-3 mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div className="bg-blue-50/50 rounded-lg border border-blue-200 p-3 mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 print:hidden">
                 <div className="flex items-center gap-1.5 text-blue-800">
                   <IconShieldAlert className="w-4 h-4" />
                   <span className="font-bold text-xs">管理者モード</span>
@@ -1266,17 +1300,17 @@
               <div className="bg-rose-50/70 border border-rose-200 rounded-lg p-10 flex flex-col items-center justify-center text-rose-600 mb-8 min-h-[300px]">
                 <IconCalendar className="w-16 h-16 mb-4 opacity-50" />
                 <h3 className="text-xl font-bold">休診日</h3>
-                <p className="text-sm font-medium mt-2 text-rose-500">この日は休診のため、枠の調整は不要です。</p>
+                <p className="text-sm font-medium mt-2 text-rose-500 print:hidden">この日は休診のため、枠の調整は不要です。</p>
                 {isEditMode && (
-                  <button onClick={handleHolidayToggle} className="mt-6 bg-white border border-rose-300 text-rose-600 hover:bg-rose-100 px-4 py-2 rounded-md text-sm font-bold shadow-sm transition-colors">
+                  <button onClick={handleHolidayToggle} className="mt-6 bg-white border border-rose-300 text-rose-600 hover:bg-rose-100 px-4 py-2 rounded-md text-sm font-bold shadow-sm transition-colors print:hidden">
                     休診日を解除して枠を編集する
                   </button>
                 )}
               </div>
             ) : (
               <>
-                <div className="bg-white rounded-lg shadow-sm border border-slate-300 overflow-hidden mb-3">
-                  <div className="bg-slate-100 border-b border-slate-300 px-4 py-3 flex justify-between items-center">
+                <div className="bg-white rounded-lg shadow-sm border border-slate-300 overflow-hidden mb-3 print:shadow-none print:border-none">
+                  <div className="bg-slate-100 border-b border-slate-300 px-4 py-3 flex justify-between items-center print:hidden">
                     <h2 className="text-base font-black text-slate-700 flex items-center gap-1.5">
                       {parseInt(selectedDate.split('-')[1])}/{parseInt(selectedDate.split('-')[2])} 
                       {getDayName(selectedDate)}
@@ -1302,7 +1336,7 @@
                   </div>
 
                   {(isEditMode || activeNotice) && (
-                    <div className="px-4 pt-3 pb-1 border-b border-slate-200 bg-white">
+                    <div className="px-4 pt-3 pb-1 border-b border-slate-200 bg-white print:border-none print:px-0">
                       {isEditMode ? (
                         <div className="bg-amber-50 rounded p-2.5 border border-amber-200 mb-2">
                           <div className="flex items-center gap-1.5 mb-1.5 text-amber-800 font-bold text-xs">
@@ -1317,9 +1351,9 @@
                           />
                         </div>
                       ) : (
-                        <div className="bg-amber-100 rounded-lg p-3 border border-amber-300 shadow-sm flex items-start gap-2 mb-2">
+                        <div className="bg-amber-100 rounded-lg p-3 border border-amber-300 shadow-sm flex items-start gap-2 mb-2 print:border-amber-800 print:bg-white print:shadow-none">
                           <IconMegaphone className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
-                          <div className="text-amber-900 text-sm whitespace-pre-wrap font-bold leading-relaxed">
+                          <div className="text-amber-900 text-sm whitespace-pre-wrap font-bold leading-relaxed print:text-black">
                             {activeNotice}
                           </div>
                         </div>
@@ -1327,13 +1361,13 @@
                     </div>
                   )}
                   
-                  <div className="p-3">
-                    <div className="bg-rose-50 border-b border-rose-200 px-4 py-2.5 flex items-center justify-between rounded-t-lg border-2 border-b-0 border-rose-200">
+                  <div className="p-3 print:p-0">
+                    <div className="bg-rose-50 border-b border-rose-200 px-4 py-2.5 flex items-center justify-between rounded-t-lg border-2 border-b-0 border-rose-200 print:border-black print:bg-white">
                       <div className="flex items-center gap-2">
-                        <span className="bg-rose-100 text-rose-800 text-xs px-2 py-1 rounded border border-rose-300 font-bold">休暇者</span>
+                        <span className="bg-rose-100 text-rose-800 text-xs px-2 py-1 rounded border border-rose-300 font-bold print:border-black print:text-black print:bg-white">休暇者</span>
                       </div>
                     </div>
-                    <div className="p-3 bg-white border-2 border-t-0 border-rose-200 rounded-b-lg mb-4">
+                    <div className="p-3 bg-white border-2 border-t-0 border-rose-200 rounded-b-lg mb-4 print:border-black">
                       {isEditMode ? (
                         <input
                           type="text"
@@ -1343,20 +1377,20 @@
                           className="w-full p-2 border-2 border-rose-300 rounded-md outline-none focus:border-rose-500 transition-all font-medium text-sm bg-rose-50/30"
                         />
                       ) : (
-                        <div className="text-sm font-bold text-slate-800 min-h-[1.5rem] flex items-center">
-                          {leavesData.staff || <span className="text-slate-400 font-normal">（なし）</span>}
+                        <div className="text-sm font-bold text-slate-800 min-h-[1.5rem] flex items-center print:text-black">
+                          {leavesData.staff || <span className="text-slate-400 font-normal print:hidden">（なし）</span>}
                         </div>
                       )}
                     </div>
 
-                    <div className="bg-indigo-50 border-b border-indigo-200 px-4 py-2 flex items-center justify-between rounded-t-lg border-2 border-b-0 border-indigo-200">
+                    <div className="bg-indigo-50 border-b border-indigo-200 px-4 py-2 flex items-center justify-between rounded-t-lg border-2 border-b-0 border-indigo-200 print:border-black print:bg-white">
                       <div className="flex items-center gap-2">
-                        <span className="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded border border-indigo-300 font-bold flex items-center gap-1">
-                          <IconAlertCircle className="w-3.5 h-3.5" /> 日中当番
+                        <span className="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded border border-indigo-300 font-bold flex items-center gap-1 print:border-black print:text-black print:bg-white">
+                          <IconAlertCircle className="w-3.5 h-3.5 print:hidden" /> 日中当番
                         </span>
                       </div>
                     </div>
-                    <div className="p-3 bg-indigo-50/10 border-2 border-t-0 border-indigo-200 rounded-b-lg mb-4">
+                    <div className="p-3 bg-indigo-50/10 border-2 border-t-0 border-indigo-200 rounded-b-lg mb-4 print:border-black print:bg-white">
                       {isEditMode ? (
                         <div className="flex flex-col gap-2.5">
                           <div>
@@ -1388,20 +1422,20 @@
                           </div>
                         </div>
                       ) : (
-                        <div className="text-sm font-bold text-slate-800 flex flex-wrap gap-4">
+                        <div className="text-sm font-bold text-slate-800 flex flex-wrap gap-4 print:text-black">
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-pink-700 border border-pink-300 bg-pink-100 px-1.5 py-0.5 rounded shadow-sm">1st Call</span>
-                            <span className="text-base">{activeOnCall.first || <span className="text-slate-400 text-sm font-normal">（未設定）</span>}</span>
+                            <span className="text-[10px] text-pink-700 border border-pink-300 bg-pink-100 px-1.5 py-0.5 rounded shadow-sm print:border-black print:text-black print:bg-white">1st Call</span>
+                            <span className="text-base">{activeOnCall.first || <span className="text-slate-400 text-sm font-normal print:hidden">（未設定）</span>}</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-sky-700 border border-sky-300 bg-sky-100 px-1.5 py-0.5 rounded shadow-sm">2nd Call</span>
-                            <span className="text-base">{activeOnCall.second || <span className="text-slate-400 text-sm font-normal">（未設定）</span>}</span>
+                            <span className="text-[10px] text-sky-700 border border-sky-300 bg-sky-100 px-1.5 py-0.5 rounded shadow-sm print:border-black print:text-black print:bg-white">2nd Call</span>
+                            <span className="text-base">{activeOnCall.second || <span className="text-slate-400 text-sm font-normal print:hidden">（未設定）</span>}</span>
                           </div>
                         </div>
                       )}
                     </div>
 
-                    <div className="flex flex-col border border-slate-200 rounded-lg overflow-hidden">
+                    <div className="flex flex-col border border-slate-200 rounded-lg overflow-hidden print:border-black print:border-2">
                       {boothsData.map((item, localIndex) => {
                         const dataIndex = localIndex + 1;
                         
@@ -1437,15 +1471,15 @@
 
                         const isError = hasLeaveConflict || hasDoubleBooking || egd2Error;
                         
-                        const rowClass = `relative flex flex-col sm:flex-row items-stretch transition-colors border-b border-slate-200 last:border-b-0 ${
+                        const rowClass = `relative flex flex-col sm:flex-row items-stretch transition-colors border-b border-slate-200 last:border-b-0 print:border-black ${
                           isError ? 'bg-red-50' : isNewBooth ? 'bg-fuchsia-50/60' : changed && !isEditMode ? 'bg-amber-50/40' : 'hover:bg-slate-50'
                         }`;
 
                         return (
                           <div key={dataIndex} className={rowClass}>
-                            {isNewBooth && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-fuchsia-400 z-10"></div>}
+                            {isNewBooth && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-fuchsia-400 z-10 print:hidden"></div>}
 
-                            <div className={`sm:w-1/3 p-2 sm:p-3 sm:border-r border-slate-200 flex flex-col justify-center shrink-0 ${
+                            <div className={`sm:w-1/3 p-2 sm:p-3 sm:border-r border-slate-200 flex flex-col justify-center shrink-0 print:border-black print:bg-white ${
                               isError ? 'bg-red-100/50' : isNewBooth ? 'bg-fuchsia-100/40 pl-3.5' : 'bg-slate-50/50'
                             }`}>
                               {isEditMode ? (
@@ -1464,13 +1498,13 @@
                                   </button>
                                 </div>
                               ) : (
-                                <span className={`inline-block px-2 py-1 rounded text-xs font-bold border w-full sm:w-auto text-center sm:text-left ${getRoleColor(item.role, isNewBooth)}`}>
+                                <span className={`inline-block px-2 py-1 rounded text-xs font-bold border w-full sm:w-auto text-center sm:text-left print:border-none print:bg-white print:text-black ${getRoleColor(item.role, isNewBooth)}`}>
                                   {item.role}
                                 </span>
                               )}
                             </div>
                             
-                            <div className="sm:w-2/3 p-2 sm:p-3 flex flex-row items-center justify-between min-h-[3rem]">
+                            <div className="sm:w-2/3 p-2 sm:p-3 flex flex-row items-center justify-between min-h-[3rem] print:bg-white">
                               <div className="flex-1 w-full flex flex-col justify-center">
                                 {isEditMode ? (
                                   <div className="w-full">
@@ -1519,41 +1553,41 @@
                                       {changed ? (
                                         <>
                                           {!isNewBooth && (
-                                            <div className="flex items-center gap-1 text-slate-400 text-[10px] font-medium mb-0.5">
+                                            <div className="flex items-center gap-1 text-slate-400 text-[10px] font-medium mb-0.5 print:hidden">
                                               <span className="line-through decoration-slate-400">{defaultStaff}</span>
                                               <IconArrowRight className="w-2.5 h-2.5" />
                                             </div>
                                           )}
-                                          <span className={`text-base sm:text-lg font-black drop-shadow-sm ${
+                                          <span className={`text-base sm:text-lg font-black drop-shadow-sm print:text-black ${
                                             isError ? 'text-red-700' : isNewBooth ? 'text-fuchsia-700' : 'text-red-600'
                                           }`}>
-                                            {currentStaff ? renderStaffWithHighlight(currentStaff, activeOnCall.first, activeOnCall.second) : <span className="text-slate-300 text-sm font-normal">（未設定）</span>}
+                                            {currentStaff ? renderStaffWithHighlight(currentStaff, activeOnCall.first, activeOnCall.second) : <span className="text-slate-300 text-sm font-normal print:hidden">（未設定）</span>}
                                           </span>
                                         </>
                                       ) : (
-                                        <span className={`text-base sm:text-lg font-black drop-shadow-sm ${isError ? 'text-red-700' : 'text-slate-800'}`}>
+                                        <span className={`text-base sm:text-lg font-black drop-shadow-sm print:text-black ${isError ? 'text-red-700' : 'text-slate-800'}`}>
                                           {currentStaff ? renderStaffWithHighlight(currentStaff, activeOnCall.first, activeOnCall.second) : null}
                                         </span>
                                       )}
                                       
                                       {hasLeaveConflict && (
-                                        <div className="text-red-600 text-[10px] font-bold mt-0.5 flex items-center gap-1">
+                                        <div className="text-red-600 text-[10px] font-bold mt-0.5 flex items-center gap-1 print:hidden">
                                           <IconAlertTriangle className="w-3 h-3" /> 休暇者 ({conflictNames.join(', ')}) が含まれています
                                         </div>
                                       )}
                                       {hasDoubleBooking && doubleBookings.map((db, i) => (
-                                        <div key={i} className="text-red-600 text-[10px] font-bold mt-0.5 flex items-center gap-1">
+                                        <div key={i} className="text-red-600 text-[10px] font-bold mt-0.5 flex items-center gap-1 print:hidden">
                                           <IconAlertTriangle className="w-3 h-3" /> 重複: {db.name} (他: {db.others.join(', ')})
                                         </div>
                                       ))}
                                       {egd2Error && (
-                                        <div className="text-rose-600 text-[10px] font-bold mt-0.5 flex items-center gap-1 bg-rose-100/50 p-1 rounded w-fit">
+                                        <div className="text-rose-600 text-[10px] font-bold mt-0.5 flex items-center gap-1 bg-rose-100/50 p-1 rounded w-fit print:hidden">
                                           <IconAlertOctagon className="w-3.5 h-3.5" /> {egd2Error}
                                         </div>
                                       )}
                                     </div>
                                     
-                                    <div className="flex gap-1 shrink-0 ml-2 flex-col sm:flex-row items-end">
+                                    <div className="flex gap-1 shrink-0 ml-2 flex-col sm:flex-row items-end print:hidden">
                                       {isNewBooth && !isError && (
                                         <span className="inline-flex items-center gap-1 bg-fuchsia-100 text-fuchsia-700 text-[10px] px-1.5 py-0.5 rounded font-bold border border-fuchsia-300">
                                           <IconSparkles className="w-3 h-3" />
@@ -1579,7 +1613,7 @@
                               
                               {/* 並べ替えボタン */}
                               {isEditMode && (
-                                <div className="flex flex-col gap-1 ml-3 shrink-0 border-l border-slate-200 pl-3 justify-center">
+                                <div className="flex flex-col gap-1 ml-3 shrink-0 border-l border-slate-200 pl-3 justify-center print:hidden">
                                   <button 
                                     onClick={() => handleMoveBooth(localIndex, 'up')}
                                     disabled={localIndex === 0}
@@ -1606,7 +1640,7 @@
                   </div>
                   
                   {isEditMode && (
-                    <div className="bg-slate-50 p-3 border-t border-slate-200">
+                    <div className="bg-slate-50 p-3 border-t border-slate-200 print:hidden">
                       <button onClick={handleAddBooth} className="w-full py-2.5 bg-white border-2 border-dashed border-fuchsia-300 text-fuchsia-600 rounded-lg flex items-center justify-center gap-2 hover:bg-fuchsia-50 transition-colors font-bold text-sm">
                         <IconPlus className="w-4 h-4" /> 日ごとの追加枠（臨時枠）を作成する
                       </button>
@@ -1617,7 +1651,7 @@
             )}
 
             {isEditMode && (
-              <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-blue-500 p-3 shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.15)] z-40">
+              <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-blue-500 p-3 shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.15)] z-40 print:hidden">
                 <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
                   <div className="text-sm font-bold text-blue-800 flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-start">
                     <IconEdit className="w-5 h-5" />
@@ -1651,7 +1685,7 @@
           </main>
 
           {showLoginModal && (
-            <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+            <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm print:hidden">
               <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                 <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-slate-50">
                   <h3 className="font-bold text-sm flex items-center gap-1.5 text-slate-800">
@@ -1697,7 +1731,7 @@
           )}
 
           {showHistoryModal && (
-            <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+            <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm print:hidden">
               <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                 <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-slate-50">
                   <h3 className="font-bold text-base flex items-center gap-1.5 text-slate-800">
