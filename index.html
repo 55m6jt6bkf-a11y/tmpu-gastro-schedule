@@ -23,6 +23,31 @@
     .hide-scrollbar::-webkit-scrollbar { display: none; }
     .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     
+    /* 当日の変更を明示する点滅アニメーション */
+    @keyframes flash-bg {
+      0%, 100% { background-color: rgba(254, 243, 199, 0.4); } /* amber-50 */
+      50% { background-color: rgba(253, 230, 138, 0.9); } /* amber-200 */
+    }
+    .animate-flash-bg {
+      animation: flash-bg 2s ease-in-out infinite;
+    }
+
+    @keyframes flash-bg-fuchsia {
+      0%, 100% { background-color: rgba(253, 244, 255, 0.6); } /* fuchsia-50 */
+      50% { background-color: rgba(245, 208, 254, 0.9); } /* fuchsia-200 */
+    }
+    .animate-flash-bg-fuchsia {
+      animation: flash-bg-fuchsia 2s ease-in-out infinite;
+    }
+
+    @keyframes flash-text {
+      0%, 100% { color: #b91c1c; text-shadow: none; } /* red-700 */
+      50% { color: #dc2626; text-shadow: 0 0 8px rgba(220, 38, 38, 0.6); } /* red-600 */
+    }
+    .animate-flash-text {
+      animation: flash-text 2s ease-in-out infinite;
+    }
+
     /* 印刷用スタイル設定 */
     @media print {
       @page {
@@ -60,6 +85,10 @@
       .sticky {
         position: static !important;
       }
+      /* 印刷時は点滅を止めて標準の色にする */
+      .animate-flash-bg { animation: none !important; background-color: rgba(254, 243, 199, 0.4) !important; }
+      .animate-flash-bg-fuchsia { animation: none !important; background-color: rgba(253, 244, 255, 0.6) !important; }
+      .animate-flash-text { animation: none !important; color: #b91c1c !important; text-shadow: none !important; }
     }
   </style>
 </head>
@@ -110,6 +139,11 @@
         if (p1.includes('潤')) return match;
         return '';
       }).trim();
+    };
+
+    const getTodayStr = () => {
+      const today = new Date();
+      return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     };
 
     const firebaseConfig = {
@@ -483,11 +517,10 @@
       const [showHistoryModal, setShowHistoryModal] = useState(false);
       const [password, setPassword] = useState('');
       const [loginError, setLoginError] = useState('');
+      
+      const todayStr = getTodayStr();
 
       useEffect(() => {
-        const today = new Date();
-        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        
         let initialDate = weeksData[0].dates[0];
         let initialWeekId = weeksData[0].id;
         let initialMonth = weeksData[0].month;
@@ -500,7 +533,8 @@
             initialWeekId = week.id;
             initialMonth = week.month;
         } else {
-            const futureDates = allDates.filter(d => new Date(d) >= today);
+            const todayDateObj = new Date(todayStr);
+            const futureDates = allDates.filter(d => new Date(d) >= todayDateObj);
             if (futureDates.length > 0) {
                 initialDate = futureDates[0];
                 const week = weeksData.find(w => w.dates.includes(initialDate));
@@ -1102,6 +1136,8 @@
                         </div>
                       </td>
                       {weekDates.map((d, i) => {
+                        const isToday = d === todayStr;
+
                         if (weekHolidays[i]) {
                           if (role === '休暇者') {
                             return <td key={d} className="p-2 text-center border-r border-slate-200 text-rose-500 font-bold bg-rose-50/50 text-xs">休診日</td>;
@@ -1121,9 +1157,9 @@
                         
                         let cellClass = 'p-2 text-center border-r border-slate-200 font-medium text-sm align-middle leading-snug ';
                         if (isNewBooth) {
-                          cellClass += 'bg-fuchsia-50/80 text-fuchsia-800 font-bold';
+                          cellClass += (isToday && !isEditMode) ? 'bg-fuchsia-100 text-fuchsia-900 font-bold animate-flash-bg-fuchsia' : 'bg-fuchsia-50/80 text-fuchsia-800 font-bold';
                         } else if (isChanged) {
-                          cellClass += 'bg-amber-50/80';
+                          cellClass += (isToday && !isEditMode) ? 'bg-amber-100/60 animate-flash-bg' : 'bg-amber-50/80';
                         } else if (role === '休暇者') {
                           cellClass += 'text-slate-700 font-bold';
                         } else {
@@ -1137,12 +1173,12 @@
                                 <div className="text-[10px] text-slate-500 line-through mb-0.5 whitespace-nowrap">
                                   {defaultStaff}
                                 </div>
-                                <div className="text-red-700 font-bold whitespace-nowrap">
+                                <div className={`font-bold whitespace-nowrap ${(isToday && !isEditMode) ? 'text-red-600 animate-flash-text' : 'text-red-700'}`}>
                                   {staff ? formatStaffNameForWeekView(staff) : <span className="text-slate-300">-</span>}
                                 </div>
                               </div>
                             ) : (
-                              <div className={isChanged && !isNewBooth ? "text-red-700 font-bold" : ""}>
+                              <div className={isChanged && !isNewBooth ? `font-bold ${(isToday && !isEditMode) ? 'text-red-600 animate-flash-text' : 'text-red-700'}` : (isNewBooth && isToday && !isEditMode ? 'animate-flash-text' : '')}>
                                 {staff ? formatStaffNameForWeekView(staff) : <span className="text-slate-300">-</span>}
                               </div>
                             )}
@@ -1474,6 +1510,8 @@
                         const currentStaff = item.staff;
                         const changed = isNewBooth || defaultStaff !== currentStaff;
                         
+                        const isToday = selectedDate === todayStr;
+                        
                         const currentBoothNames = currentStaff.split(/[\s,、・]+|or/).map(n => getPureName(n)).filter(n => n.length > 0);
                         const currentBoothPeriod = getPeriod(item.role);
 
@@ -1500,7 +1538,7 @@
                         const isError = hasLeaveConflict || hasDoubleBooking || egd2Error;
                         
                         const rowClass = `relative flex flex-col sm:flex-row items-stretch transition-colors border-b border-slate-200 last:border-b-0 ${
-                          isError ? 'bg-red-50' : isNewBooth ? 'bg-fuchsia-50/60' : changed && !isEditMode ? 'bg-amber-50/40' : 'hover:bg-slate-50'
+                          isError ? 'bg-red-50' : isNewBooth ? (isToday && !isEditMode ? 'animate-flash-bg-fuchsia' : 'bg-fuchsia-50/60') : changed && !isEditMode ? (isToday ? 'animate-flash-bg border-amber-300' : 'bg-amber-50/40') : 'hover:bg-slate-50'
                         }`;
 
                         return (
@@ -1587,7 +1625,7 @@
                                             </div>
                                           )}
                                           <span className={`text-base sm:text-lg font-black drop-shadow-sm ${
-                                            isError ? 'text-red-700' : isNewBooth ? 'text-fuchsia-700' : 'text-red-600'
+                                            isError ? 'text-red-700' : isNewBooth ? (isToday ? 'text-fuchsia-700 animate-flash-text' : 'text-fuchsia-700') : (isToday ? 'text-red-600 animate-flash-text' : 'text-red-600')
                                           }`}>
                                             {currentStaff ? renderStaffWithHighlight(currentStaff, activeOnCall.first, activeOnCall.second) : <span className="text-slate-300 text-sm font-normal">（未設定）</span>}
                                           </span>
@@ -1604,7 +1642,7 @@
                                         </div>
                                       )}
                                       {hasDoubleBooking && doubleBookings.map((db, i) => (
-                                        <div className="text-red-600 text-[10px] font-bold mt-0.5 flex items-center gap-1">
+                                        <div key={i} className="text-red-600 text-[10px] font-bold mt-0.5 flex items-center gap-1">
                                           <IconAlertTriangle className="w-3 h-3" /> 重複: {db.name} (他: {db.others.join(', ')})
                                         </div>
                                       ))}
@@ -1617,9 +1655,9 @@
                                     
                                     <div className="flex gap-1 shrink-0 ml-2 flex-col sm:flex-row items-end print:hidden">
                                       {isNewBooth && !isError && (
-                                        <span className="inline-flex items-center gap-1 bg-fuchsia-100 text-fuchsia-700 text-[10px] px-1.5 py-0.5 rounded font-bold border border-fuchsia-300">
+                                        <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-bold border ${isToday ? 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-400 animate-pulse' : 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300'}`}>
                                           <IconSparkles className="w-3 h-3" />
-                                          <span className="hidden sm:inline">追加枠</span>
+                                          <span className="hidden sm:inline">{isToday ? '当日の追加' : '追加枠'}</span>
                                         </span>
                                       )}
                                       {isError && (
@@ -1629,9 +1667,9 @@
                                         </span>
                                       )}
                                       {changed && !isError && !isNewBooth && (
-                                        <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded font-bold border border-amber-300">
+                                        <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-bold border ${isToday ? 'bg-red-100 text-red-800 border-red-400 animate-pulse' : 'bg-amber-100 text-amber-700 border-amber-300'}`}>
                                           <IconAlertCircle className="w-3 h-3" />
-                                          <span className="hidden sm:inline">変更あり</span>
+                                          <span className="hidden sm:inline">{isToday ? '当日の変更' : '変更あり'}</span>
                                         </span>
                                       )}
                                     </div>
