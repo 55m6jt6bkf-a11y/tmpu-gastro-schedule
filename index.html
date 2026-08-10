@@ -1160,7 +1160,7 @@
 
       return (
         <div>
-          <header className="bg-blue-800 text-white p-3 sm:p-4 shadow-md sticky top-0 z-30 print:hidden">
+          <header className="bg-blue-800 text-white p-3 sm:p-4 print:hidden">
             <div className="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
               <div className="flex items-center gap-2">
                 <IconCalendar className="w-5 h-5 text-blue-200" />
@@ -1188,10 +1188,10 @@
             </div>
           </header>
 
-          <main className="max-w-4xl mx-auto p-3 sm:p-4 pb-28">
+          <main className="max-w-4xl mx-auto p-3 sm:p-4 pb-28 pt-4">
             
-            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 mb-4 sticky top-[72px] sm:top-[60px] z-20 print:hidden">
-              <div className="flex overflow-x-auto gap-2 pb-2 mb-2 border-b border-slate-100 hide-scrollbar">
+            <div className="bg-white/95 backdrop-blur-md rounded-lg shadow-md border border-slate-200 p-2 sm:p-3 mb-4 sticky top-2 sm:top-3 z-30 print:hidden transition-all">
+              <div className="flex overflow-x-auto gap-2 pb-1.5 mb-1.5 border-b border-slate-100 hide-scrollbar">
                 {months.map(month => (
                   <button
                     key={month}
@@ -1205,7 +1205,7 @@
                 ))}
               </div>
 
-              <div className="flex justify-between items-center mb-1.5 gap-2 flex-wrap">
+              <div className="flex justify-between items-center mb-1 gap-2 flex-wrap">
                 <div className="flex overflow-x-auto gap-1 hide-scrollbar">
                   {weeksData.filter(w => w.month === selectedMonth).map((week) => (
                     <button
@@ -1221,14 +1221,14 @@
                     </button>
                   ))}
                 </div>
-                <div className="flex gap-1.5 shrink-0 overflow-x-auto hide-scrollbar pb-1 sm:pb-0 w-full sm:w-auto mt-2 sm:mt-0">
+                <div className="flex gap-1.5 shrink-0 overflow-x-auto hide-scrollbar w-full sm:w-auto mt-1 sm:mt-0">
                   <button
                     onClick={handleExportPDF}
                     className="flex items-center gap-1 text-xs bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 px-2 py-1.5 rounded transition-colors font-bold shadow-sm shrink-0"
                     title="表示されている週をPDF印刷・保存"
                   >
                     <IconFileText className="w-3.5 h-3.5" />
-                    <span>印刷 / PDF出力</span>
+                    <span>印刷 / PDF</span>
                   </button>
                   <button
                     onClick={() => handleExportExcel('week')}
@@ -1249,7 +1249,7 @@
                 </div>
               </div>
 
-              <div className="flex bg-slate-100 p-1 rounded-lg w-full sm:w-fit mt-3 mb-1">
+              <div className="flex bg-slate-100 p-1 rounded-lg w-full sm:w-fit mt-2 mb-1">
                 <button
                   onClick={() => setViewMode('day')}
                   className={`flex-1 sm:flex-none flex justify-center items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${
@@ -1271,7 +1271,7 @@
               </div>
 
               {viewMode === 'day' && (
-                <div className="flex overflow-x-auto gap-1.5 hide-scrollbar mt-2">
+                <div className="flex overflow-x-auto gap-1.5 hide-scrollbar mt-1.5">
                   {currentWeekData.dates.map((dateStr) => {
                     const [, month, day] = dateStr.split('-');
                     const isSelected = selectedDate === dateStr;
@@ -1604,7 +1604,7 @@
                                         </div>
                                       )}
                                       {hasDoubleBooking && doubleBookings.map((db, i) => (
-                                        <div key={i} className="text-red-600 text-[10px] font-bold mt-0.5 flex items-center gap-1">
+                                        <div className="text-red-600 text-[10px] font-bold mt-0.5 flex items-center gap-1">
                                           <IconAlertTriangle className="w-3 h-3" /> 重複: {db.name} (他: {db.others.join(', ')})
                                         </div>
                                       ))}
@@ -1839,3 +1839,5 @@
   </script>
 </body>
 </html>
+
+
