@@ -502,6 +502,7 @@
       const [selectedMonth, setSelectedMonth] = useState(8);
       const [selectedWeek, setSelectedWeek] = useState(weeksData[0].id);
       const [selectedDate, setSelectedDate] = useState(weeksData[0].dates[0]);
+      // 追加: viewModeの管理に 'digest' (週別ダイジェスト) を含める
       const [viewMode, setViewMode] = useState('day');
       
       const [isAdmin, setIsAdmin] = useState(false);
@@ -737,7 +738,7 @@
 
       // --- PDFエクスポート処理（ブラウザ標準の印刷機能を利用） ---
       const handleExportPDF = async () => {
-        if (viewMode !== 'week') {
+        if (viewMode !== 'week' && viewMode !== 'digest') {
           setViewMode('week');
           // 画面の切り替え描画を待つ
           await new Promise(resolve => setTimeout(resolve, 300));
@@ -1006,7 +1007,7 @@
       
       const currentDayOfWeek = new Date(selectedDate).getDay();
 
-      const renderWeekView = () => {
+      const renderWeekView = (isDigest = false) => {
         const weekDates = currentWeekData.dates;
         const weekSchedules = weekDates.map(d => pendingChanges[d] || schedules[d] || defaultSchedules[d]);
         const weekHolidays = weekDates.map(d => pendingHolidays[d] !== undefined ? pendingHolidays[d] : holidays[d]);
@@ -1076,6 +1077,39 @@
         };
         // -----------------------------------------------------------------
 
+        let displayRoles = allRoles;
+        let showFirstCall = true;
+        let showSecondCall = true;
+
+        if (isDigest) {
+          const changedRolesSet = new Set();
+          let hasFirstCall = false;
+          let hasSecondCall = false;
+
+          weekSchedules.forEach((dayData, dayIdx) => {
+            if (!weekHolidays[dayIdx] && dayData) {
+              dayData.forEach((item) => {
+                const defaultDayData = weekDefaultSchedules[dayIdx];
+                const defaultItem = defaultDayData ? defaultDayData.find(x => x.role === item.role) : null;
+                const staff = item ? item.staff : '';
+                const defaultStaff = defaultItem ? defaultItem.staff : '';
+                if (staff !== defaultStaff) {
+                  changedRolesSet.add(item.role);
+                }
+              });
+            }
+            const oc = weekOnCalls[dayIdx];
+            if (!weekHolidays[dayIdx]) {
+              if (oc?.first) hasFirstCall = true;
+              if (oc?.second) hasSecondCall = true;
+            }
+          });
+
+          displayRoles = allRoles.filter(r => changedRolesSet.has(r));
+          showFirstCall = hasFirstCall;
+          showSecondCall = hasSecondCall;
+        }
+
         return (
           <div id="week-table-container" className="bg-white rounded-lg shadow-sm border border-slate-300 overflow-hidden mb-8 overflow-x-auto relative">
             <table className="w-full text-sm min-w-[700px] border-collapse">
@@ -1100,32 +1134,36 @@
               </thead>
               <tbody>
                 {/* 1st Call */}
-                <tr className="border-b border-slate-200 bg-pink-50/40 hover:bg-pink-100/50 transition-colors">
-                  <td className="p-2 font-bold sticky left-0 z-10 bg-pink-50 border-r border-slate-300 text-pink-800 text-center shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
-                    <div className="text-[9px] font-bold text-pink-600 mb-0.5 whitespace-nowrap">日中当番</div>
-                    <div className="text-xs">1st Call</div>
-                  </td>
-                  {weekDates.map((d, i) => (
-                    <td key={d} className="p-2 text-center border-r border-slate-200 last:border-r-0 font-bold text-pink-900">
-                      {weekHolidays[i] ? <span className="text-rose-300">-</span> : (weekOnCalls[i]?.first ? formatStaffNameForWeekView(weekOnCalls[i].first) : <span className="text-slate-300">-</span>)}
+                {showFirstCall && (
+                  <tr className="border-b border-slate-200 bg-pink-50/40 hover:bg-pink-100/50 transition-colors">
+                    <td className="p-2 font-bold sticky left-0 z-10 bg-pink-50 border-r border-slate-300 text-pink-800 text-center shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                      <div className="text-[9px] font-bold text-pink-600 mb-0.5 whitespace-nowrap">日中当番</div>
+                      <div className="text-xs">1st Call</div>
                     </td>
-                  ))}
-                </tr>
+                    {weekDates.map((d, i) => (
+                      <td key={d} className="p-2 text-center border-r border-slate-200 last:border-r-0 font-bold text-pink-900">
+                        {weekHolidays[i] ? <span className="text-rose-300">-</span> : (weekOnCalls[i]?.first ? formatStaffNameForWeekView(weekOnCalls[i].first) : <span className="text-slate-300">-</span>)}
+                      </td>
+                    ))}
+                  </tr>
+                )}
                 {/* 2nd Call */}
-                <tr className="border-b border-slate-300 bg-sky-50/40 hover:bg-sky-100/50 transition-colors">
-                  <td className="p-2 font-bold sticky left-0 z-10 bg-sky-50 border-r border-slate-300 text-sky-800 text-center shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
-                    <div className="text-[9px] font-bold text-sky-600 mb-0.5 whitespace-nowrap">日中当番</div>
-                    <div className="text-xs">2nd Call</div>
-                  </td>
-                  {weekDates.map((d, i) => (
-                    <td key={d} className="p-2 text-center border-r border-slate-200 last:border-r-0 font-bold text-sky-900">
-                      {weekHolidays[i] ? <span className="text-rose-300">-</span> : (weekOnCalls[i]?.second ? formatStaffNameForWeekView(weekOnCalls[i].second) : <span className="text-slate-300">-</span>)}
+                {showSecondCall && (
+                  <tr className="border-b border-slate-300 bg-sky-50/40 hover:bg-sky-100/50 transition-colors">
+                    <td className="p-2 font-bold sticky left-0 z-10 bg-sky-50 border-r border-slate-300 text-sky-800 text-center shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                      <div className="text-[9px] font-bold text-sky-600 mb-0.5 whitespace-nowrap">日中当番</div>
+                      <div className="text-xs">2nd Call</div>
                     </td>
-                  ))}
-                </tr>
+                    {weekDates.map((d, i) => (
+                      <td key={d} className="p-2 text-center border-r border-slate-200 last:border-r-0 font-bold text-sky-900">
+                        {weekHolidays[i] ? <span className="text-rose-300">-</span> : (weekOnCalls[i]?.second ? formatStaffNameForWeekView(weekOnCalls[i].second) : <span className="text-slate-300">-</span>)}
+                      </td>
+                    ))}
+                  </tr>
+                )}
                 
-                {/* allRoles */}
-                {allRoles.map(role => {
+                {/* displayRoles */}
+                {displayRoles.map(role => {
                   const isWeeklyNewBooth = isRoleNewBoothInWeek(role);
                   const rowColorClass = role === '休暇者' ? 'bg-rose-50/20' : 'bg-white hover:bg-slate-50 transition-colors';
                   return (
@@ -1188,6 +1226,14 @@
                     </tr>
                   );
                 })}
+
+                {isDigest && displayRoles.length === 0 && !showFirstCall && !showSecondCall && (
+                  <tr>
+                    <td colSpan={weekDates.length + 1} className="p-8 text-center text-slate-500 font-bold bg-slate-50">
+                      この週の変更はありません
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1285,24 +1331,33 @@
                 </div>
               </div>
 
-              <div className="flex bg-slate-100 p-1 rounded-lg w-full sm:w-fit mt-2 mb-1">
+              <div className="flex bg-slate-100 p-1 rounded-lg w-full overflow-x-auto hide-scrollbar mt-2 mb-1 gap-1">
                 <button
                   onClick={() => setViewMode('day')}
-                  className={`flex-1 sm:flex-none flex justify-center items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${
+                  className={`flex-1 sm:flex-none flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
                     viewMode === 'day' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:bg-slate-200'
                   }`}
                 >
                   <IconCalendar className="w-4 h-4" />
-                  日別表示
+                  日別
                 </button>
                 <button
                   onClick={() => setViewMode('week')}
-                  className={`flex-1 sm:flex-none flex justify-center items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${
+                  className={`flex-1 sm:flex-none flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
                     viewMode === 'week' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:bg-slate-200'
                   }`}
                 >
                   <IconTable className="w-4 h-4" />
-                  週別表示
+                  週別
+                </button>
+                <button
+                  onClick={() => setViewMode('digest')}
+                  className={`flex-1 sm:flex-none flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
+                    viewMode === 'digest' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:bg-slate-200'
+                  }`}
+                >
+                  <IconSparkles className="w-4 h-4" />
+                  週別ダイジェスト
                 </button>
               </div>
 
@@ -1360,7 +1415,7 @@
               </div>
             )}
 
-            {viewMode === 'week' ? renderWeekView() : activeIsHoliday ? (
+            {viewMode === 'week' || viewMode === 'digest' ? renderWeekView(viewMode === 'digest') : activeIsHoliday ? (
               <div className="bg-rose-50/70 border border-rose-200 rounded-lg p-10 flex flex-col items-center justify-center text-rose-600 mb-8 min-h-[300px]">
                 <IconCalendar className="w-16 h-16 mb-4 opacity-50" />
                 <h3 className="text-xl font-bold">休診日</h3>
@@ -1877,5 +1932,4 @@
   </script>
 </body>
 </html>
-
 
