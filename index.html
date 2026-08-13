@@ -502,7 +502,6 @@
       const [selectedMonth, setSelectedMonth] = useState(8);
       const [selectedWeek, setSelectedWeek] = useState(weeksData[0].id);
       const [selectedDate, setSelectedDate] = useState(weeksData[0].dates[0]);
-      // 追加: viewModeの管理に 'digest' (週別ダイジェスト) を含める
       const [viewMode, setViewMode] = useState('day');
       
       const [isAdmin, setIsAdmin] = useState(false);
@@ -518,6 +517,10 @@
       const [showHistoryModal, setShowHistoryModal] = useState(false);
       const [password, setPassword] = useState('');
       const [loginError, setLoginError] = useState('');
+
+      // スクロール状態の管理を追加
+      const [showStickyNav, setShowStickyNav] = useState(true);
+      const [lastScrollY, setLastScrollY] = useState(0);
       
       const todayStr = getTodayStr();
 
@@ -601,6 +604,29 @@
         });
         return () => unsubscribers.forEach(unsub => unsub());
       }, [user]);
+
+      // スクロール検知用のuseEffectを追加
+      useEffect(() => {
+        const handleScroll = () => {
+          const currentScrollY = window.scrollY;
+          
+          if (currentScrollY <= 50) {
+            // ページ上部では常に表示
+            setShowStickyNav(true);
+          } else if (currentScrollY > lastScrollY) {
+            // 下にスクロール中（画面が下へ移動）
+            setShowStickyNav(false);
+          } else {
+            // 上にスクロール中（画面が上へ移動）
+            setShowStickyNav(true);
+          }
+          
+          setLastScrollY(currentScrollY);
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+      }, [lastScrollY]);
 
       const handleMonthChange = (month) => {
         setSelectedMonth(month);
@@ -1272,7 +1298,10 @@
 
           <main className="max-w-4xl mx-auto p-3 sm:p-4 pb-28 pt-4">
             
-            <div className="bg-white/95 backdrop-blur-md rounded-lg shadow-md border border-slate-200 p-2 sm:p-3 mb-4 sticky top-2 sm:top-3 z-30 print:hidden transition-all">
+            {/* ナビゲーション領域にスクロール検知クラスを追加 */}
+            <div className={`bg-white/95 backdrop-blur-md rounded-lg shadow-md border border-slate-200 p-2 sm:p-3 mb-4 sticky top-2 sm:top-3 z-30 print:hidden transition-all duration-300 origin-top ${
+              showStickyNav ? 'translate-y-0 opacity-100' : '-translate-y-[120%] opacity-0 pointer-events-none'
+            }`}>
               <div className="flex overflow-x-auto gap-2 pb-1.5 mb-1.5 border-b border-slate-100 hide-scrollbar">
                 {months.map(month => (
                   <button
@@ -1932,4 +1961,5 @@
   </script>
 </body>
 </html>
+
 
