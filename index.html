@@ -518,7 +518,6 @@
       const [password, setPassword] = useState('');
       const [loginError, setLoginError] = useState('');
 
-      // スクロール状態の管理を追加
       const [showStickyNav, setShowStickyNav] = useState(true);
       const [lastScrollY, setLastScrollY] = useState(0);
       
@@ -605,19 +604,15 @@
         return () => unsubscribers.forEach(unsub => unsub());
       }, [user]);
 
-      // スクロール検知用のuseEffectを追加
       useEffect(() => {
         const handleScroll = () => {
           const currentScrollY = window.scrollY;
           
           if (currentScrollY <= 50) {
-            // ページ上部では常に表示
             setShowStickyNav(true);
           } else if (currentScrollY > lastScrollY) {
-            // 下にスクロール中（画面が下へ移動）
             setShowStickyNav(false);
           } else {
-            // 上にスクロール中（画面が上へ移動）
             setShowStickyNav(true);
           }
           
@@ -1137,131 +1132,165 @@
         }
 
         return (
-          <div id="week-table-container" className="bg-white rounded-lg shadow-sm border border-slate-300 overflow-hidden mb-8 overflow-x-auto relative">
-            <table className="w-full text-sm min-w-[700px] border-collapse">
-              <thead>
-                <tr className="bg-slate-100 border-b-2 border-slate-300">
-                  <th className="p-2 text-center w-24 sticky left-0 z-20 bg-slate-100 border-r border-slate-300 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">担当・枠</th>
-                  {weekDates.map((d, i) => (
-                    <th 
-                      key={d} 
-                      className={`p-2 text-center min-w-[120px] border-r border-slate-200 last:border-r-0 cursor-pointer hover:bg-slate-200 transition-colors ${weekHolidays[i] ? 'text-rose-600' : 'text-slate-700'}`}
-                      onClick={() => {
-                        handleDateChange(d);
-                        setViewMode('day');
-                      }}
-                      title="クリックして日別ビューへ"
-                    >
-                      <div className="font-bold">{parseInt(d.split('-')[1])}/{parseInt(d.split('-')[2])}</div>
-                      <div className="text-xs">{getDayName(d)}</div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {/* 1st Call */}
-                {showFirstCall && (
-                  <tr className="border-b border-slate-200 bg-pink-50/40 hover:bg-pink-100/50 transition-colors">
-                    <td className="p-2 font-bold sticky left-0 z-10 bg-pink-50 border-r border-slate-300 text-pink-800 text-center shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
-                      <div className="text-[9px] font-bold text-pink-600 mb-0.5 whitespace-nowrap">日中当番</div>
-                      <div className="text-xs">1st Call</div>
-                    </td>
+          <div className="mb-8">
+            {isDigest && (
+              <div className="bg-amber-50 text-amber-800 text-sm font-bold px-4 py-2.5 rounded-t-lg border border-amber-200 border-b-0 flex items-center gap-2">
+                <IconAlertCircle className="w-4 h-4 text-amber-600" />
+                変更点（担当の変更や追加枠など）のみを抜粋して記載しています
+              </div>
+            )}
+            <div id="week-table-container" className={`bg-white rounded-lg shadow-sm border border-slate-300 overflow-hidden overflow-x-auto relative ${isDigest ? 'rounded-tl-none rounded-tr-none' : ''}`}>
+              <table className="w-full text-sm min-w-[700px] border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 border-b-2 border-slate-300">
+                    <th className="p-2 text-center w-24 sticky left-0 z-20 bg-slate-100 border-r border-slate-300 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">担当・枠</th>
                     {weekDates.map((d, i) => (
-                      <td key={d} className="p-2 text-center border-r border-slate-200 last:border-r-0 font-bold text-pink-900">
-                        {weekHolidays[i] ? <span className="text-rose-300">-</span> : (weekOnCalls[i]?.first ? formatStaffNameForWeekView(weekOnCalls[i].first) : <span className="text-slate-300">-</span>)}
-                      </td>
+                      <th 
+                        key={d} 
+                        className={`p-2 text-center min-w-[120px] border-r border-slate-200 last:border-r-0 cursor-pointer hover:bg-slate-200 transition-colors ${weekHolidays[i] ? 'text-rose-600' : 'text-slate-700'}`}
+                        onClick={() => {
+                          handleDateChange(d);
+                          setViewMode('day');
+                        }}
+                        title="クリックして日別ビューへ"
+                      >
+                        <div className="font-bold">{parseInt(d.split('-')[1])}/{parseInt(d.split('-')[2])}</div>
+                        <div className="text-xs">{getDayName(d)}</div>
+                      </th>
                     ))}
                   </tr>
-                )}
-                {/* 2nd Call */}
-                {showSecondCall && (
-                  <tr className="border-b border-slate-300 bg-sky-50/40 hover:bg-sky-100/50 transition-colors">
-                    <td className="p-2 font-bold sticky left-0 z-10 bg-sky-50 border-r border-slate-300 text-sky-800 text-center shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
-                      <div className="text-[9px] font-bold text-sky-600 mb-0.5 whitespace-nowrap">日中当番</div>
-                      <div className="text-xs">2nd Call</div>
-                    </td>
-                    {weekDates.map((d, i) => (
-                      <td key={d} className="p-2 text-center border-r border-slate-200 last:border-r-0 font-bold text-sky-900">
-                        {weekHolidays[i] ? <span className="text-rose-300">-</span> : (weekOnCalls[i]?.second ? formatStaffNameForWeekView(weekOnCalls[i].second) : <span className="text-slate-300">-</span>)}
-                      </td>
-                    ))}
-                  </tr>
-                )}
-                
-                {/* displayRoles */}
-                {displayRoles.map(role => {
-                  const isWeeklyNewBooth = isRoleNewBoothInWeek(role);
-                  const rowColorClass = role === '休暇者' ? 'bg-rose-50/20' : 'bg-white hover:bg-slate-50 transition-colors';
-                  return (
-                    <tr key={role} className={`border-b border-slate-200 last:border-b-0 ${rowColorClass}`}>
-                      <td className="p-1.5 sticky left-0 z-10 bg-white border-r border-slate-300 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] align-middle">
-                        <div className={`mx-auto w-full max-w-[90px] px-1 py-1 rounded text-[11px] font-bold border text-center whitespace-normal break-words leading-tight ${getRoleColor(role, isWeeklyNewBooth)}`}>
-                          {role}
-                        </div>
+                </thead>
+                <tbody>
+                  {/* 1st Call */}
+                  {showFirstCall && (
+                    <tr className="border-b border-slate-200 bg-pink-50/40 hover:bg-pink-100/50 transition-colors">
+                      <td className="p-2 font-bold sticky left-0 z-10 bg-pink-50 border-r border-slate-300 text-pink-800 text-center shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                        <div className="text-[9px] font-bold text-pink-600 mb-0.5 whitespace-nowrap">日中当番</div>
+                        <div className="text-xs">1st Call</div>
                       </td>
                       {weekDates.map((d, i) => {
-                        const isToday = d === todayStr;
-
+                        const hasOnCall = !!weekOnCalls[i]?.first;
                         if (weekHolidays[i]) {
-                          if (role === '休暇者') {
-                            return <td key={d} className="p-2 text-center border-r border-slate-200 text-rose-500 font-bold bg-rose-50/50 text-xs">休診日</td>;
-                          }
-                          return <td key={d} className="p-2 text-center border-r border-slate-200 bg-slate-50/50"></td>;
+                          return <td key={d} className="p-2 text-center border-r border-slate-200"><span className="text-rose-300">-</span></td>;
                         }
-                        
-                        const dayData = weekSchedules[i];
-                        const defaultDayData = weekDefaultSchedules[i];
-                        const item = dayData ? dayData.find(x => x.role === role) : null;
-                        const defaultItem = defaultDayData ? defaultDayData.find(x => x.role === role) : null;
-                        
-                        const staff = item ? item.staff : '';
-                        const defaultStaff = defaultItem ? defaultItem.staff : '';
-                        const isChanged = staff !== defaultStaff;
-                        const isNewBooth = !defaultItem && item;
-                        
-                        let cellClass = 'p-2 text-center border-r border-slate-200 font-medium text-sm align-middle leading-snug ';
-                        if (isNewBooth) {
-                          cellClass += (isToday && !isEditMode) ? 'bg-fuchsia-100 text-fuchsia-900 font-bold animate-flash-bg-fuchsia' : 'bg-fuchsia-50/80 text-fuchsia-800 font-bold';
-                        } else if (isChanged) {
-                          cellClass += (isToday && !isEditMode) ? 'bg-amber-100/60 animate-flash-bg' : 'bg-amber-50/80';
-                        } else if (role === '休暇者') {
-                          cellClass += 'text-slate-700 font-bold';
-                        } else {
-                          cellClass += 'text-slate-800';
+                        if (isDigest && !hasOnCall) {
+                          return <td key={d} className="p-2 text-center border-r border-slate-200 bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(0,0,0,0.02)_4px,rgba(0,0,0,0.02)_8px)]"></td>;
                         }
-
                         return (
-                          <td key={d} className={cellClass}>
-                            {isChanged && !isNewBooth && defaultStaff ? (
-                              <div className="flex flex-col items-center justify-center">
-                                <div className="text-[10px] text-slate-500 line-through mb-0.5 whitespace-nowrap">
-                                  {defaultStaff}
-                                </div>
-                                <div className={`font-bold whitespace-nowrap ${(isToday && !isEditMode) ? 'text-red-600 animate-flash-text' : 'text-red-700'}`}>
-                                  {staff ? formatStaffNameForWeekView(staff) : <span className="text-slate-300">-</span>}
-                                </div>
-                              </div>
-                            ) : (
-                              <div className={isChanged && !isNewBooth ? `font-bold ${(isToday && !isEditMode) ? 'text-red-600 animate-flash-text' : 'text-red-700'}` : (isNewBooth && isToday && !isEditMode ? 'animate-flash-text' : '')}>
-                                {staff ? formatStaffNameForWeekView(staff) : <span className="text-slate-300">-</span>}
-                              </div>
-                            )}
+                          <td key={d} className="p-2 text-center border-r border-slate-200 last:border-r-0 font-bold text-pink-900">
+                            {hasOnCall ? formatStaffNameForWeekView(weekOnCalls[i].first) : <span className="text-slate-300">-</span>}
                           </td>
                         );
                       })}
                     </tr>
-                  );
-                })}
+                  )}
+                  {/* 2nd Call */}
+                  {showSecondCall && (
+                    <tr className="border-b border-slate-300 bg-sky-50/40 hover:bg-sky-100/50 transition-colors">
+                      <td className="p-2 font-bold sticky left-0 z-10 bg-sky-50 border-r border-slate-300 text-sky-800 text-center shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                        <div className="text-[9px] font-bold text-sky-600 mb-0.5 whitespace-nowrap">日中当番</div>
+                        <div className="text-xs">2nd Call</div>
+                      </td>
+                      {weekDates.map((d, i) => {
+                        const hasOnCall = !!weekOnCalls[i]?.second;
+                        if (weekHolidays[i]) {
+                          return <td key={d} className="p-2 text-center border-r border-slate-200"><span className="text-rose-300">-</span></td>;
+                        }
+                        if (isDigest && !hasOnCall) {
+                          return <td key={d} className="p-2 text-center border-r border-slate-200 bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(0,0,0,0.02)_4px,rgba(0,0,0,0.02)_8px)]"></td>;
+                        }
+                        return (
+                          <td key={d} className="p-2 text-center border-r border-slate-200 last:border-r-0 font-bold text-sky-900">
+                            {hasOnCall ? formatStaffNameForWeekView(weekOnCalls[i].second) : <span className="text-slate-300">-</span>}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  )}
+                  
+                  {/* displayRoles */}
+                  {displayRoles.map(role => {
+                    const isWeeklyNewBooth = isRoleNewBoothInWeek(role);
+                    const rowColorClass = role === '休暇者' ? 'bg-rose-50/20' : 'bg-white hover:bg-slate-50 transition-colors';
+                    return (
+                      <tr key={role} className={`border-b border-slate-200 last:border-b-0 ${rowColorClass}`}>
+                        <td className="p-1.5 sticky left-0 z-10 bg-white border-r border-slate-300 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] align-middle">
+                          <div className={`mx-auto w-full max-w-[90px] px-1 py-1 rounded text-[11px] font-bold border text-center whitespace-normal break-words leading-tight ${getRoleColor(role, isWeeklyNewBooth)}`}>
+                            {role}
+                          </div>
+                        </td>
+                        {weekDates.map((d, i) => {
+                          const isToday = d === todayStr;
 
-                {isDigest && displayRoles.length === 0 && !showFirstCall && !showSecondCall && (
-                  <tr>
-                    <td colSpan={weekDates.length + 1} className="p-8 text-center text-slate-500 font-bold bg-slate-50">
-                      この週の変更はありません
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                          if (weekHolidays[i]) {
+                            if (role === '休暇者') {
+                              return <td key={d} className="p-2 text-center border-r border-slate-200 text-rose-500 font-bold bg-rose-50/50 text-xs">休診日</td>;
+                            }
+                            return <td key={d} className="p-2 text-center border-r border-slate-200 bg-slate-50/50"></td>;
+                          }
+                          
+                          const dayData = weekSchedules[i];
+                          const defaultDayData = weekDefaultSchedules[i];
+                          const item = dayData ? dayData.find(x => x.role === role) : null;
+                          const defaultItem = defaultDayData ? defaultDayData.find(x => x.role === role) : null;
+                          
+                          const staff = item ? item.staff : '';
+                          const defaultStaff = defaultItem ? defaultItem.staff : '';
+                          const isChanged = staff !== defaultStaff;
+                          const isNewBooth = !defaultItem && item;
+
+                          // 週別ダイジェストで変更がない日は斜線背景にして中身を空にする
+                          if (isDigest && !isChanged && !isNewBooth) {
+                            return (
+                              <td key={d} className="p-2 text-center border-r border-slate-200 bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(0,0,0,0.02)_4px,rgba(0,0,0,0.02)_8px)]">
+                              </td>
+                            );
+                          }
+                          
+                          let cellClass = 'p-2 text-center border-r border-slate-200 font-medium text-sm align-middle leading-snug ';
+                          if (isNewBooth) {
+                            cellClass += (isToday && !isEditMode) ? 'bg-fuchsia-100 text-fuchsia-900 font-bold animate-flash-bg-fuchsia' : 'bg-fuchsia-50/80 text-fuchsia-800 font-bold';
+                          } else if (isChanged) {
+                            cellClass += (isToday && !isEditMode) ? 'bg-amber-100/60 animate-flash-bg' : 'bg-amber-50/80';
+                          } else if (role === '休暇者') {
+                            cellClass += 'text-slate-700 font-bold';
+                          } else {
+                            cellClass += 'text-slate-800';
+                          }
+
+                          return (
+                            <td key={d} className={cellClass}>
+                              {isChanged && !isNewBooth && defaultStaff ? (
+                                <div className="flex flex-col items-center justify-center">
+                                  <div className="text-[10px] text-slate-500 line-through mb-0.5 whitespace-nowrap">
+                                    {defaultStaff}
+                                  </div>
+                                  <div className={`font-bold whitespace-nowrap ${(isToday && !isEditMode) ? 'text-red-600 animate-flash-text' : 'text-red-700'}`}>
+                                    {staff ? formatStaffNameForWeekView(staff) : <span className="text-slate-300">-</span>}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className={isChanged && !isNewBooth ? `font-bold ${(isToday && !isEditMode) ? 'text-red-600 animate-flash-text' : 'text-red-700'}` : (isNewBooth && isToday && !isEditMode ? 'animate-flash-text' : '')}>
+                                  {staff ? formatStaffNameForWeekView(staff) : <span className="text-slate-300">-</span>}
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+
+                  {isDigest && displayRoles.length === 0 && !showFirstCall && !showSecondCall && (
+                    <tr>
+                      <td colSpan={weekDates.length + 1} className="p-8 text-center text-slate-500 font-bold bg-slate-50">
+                        この週の変更はありません
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         );
       };
