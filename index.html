@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>業務変更表</title>
+  <title>出番変更表</title>
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -1043,7 +1043,8 @@
             if (['・', 'or', '、'].includes(part) || part.trim() === '') {
               return <span key={index}>{part}</span>;
             }
-            return <span key={index} className="inline">{part}</span>;
+            // inline-block と whitespace-nowrap を追加して、1人の名前の途中で改行させない
+            return <span key={index} className="inline-block whitespace-nowrap">{part}</span>;
           });
         };
 
@@ -1265,7 +1266,7 @@
                                   <div className="text-[10px] text-slate-500 line-through mb-0.5 whitespace-nowrap">
                                     {defaultStaff}
                                   </div>
-                                  <div className={`font-bold whitespace-nowrap ${(isToday && !isEditMode) ? 'text-red-600 animate-flash-text' : 'text-red-700'}`}>
+                                  <div className={`font-bold ${(isToday && !isEditMode) ? 'text-red-600 animate-flash-text' : 'text-red-700'}`}>
                                     {staff ? formatStaffNameForWeekView(staff) : <span className="text-slate-300">-</span>}
                                   </div>
                                 </div>
