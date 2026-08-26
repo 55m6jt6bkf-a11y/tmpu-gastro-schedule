@@ -251,7 +251,6 @@
       let startDate = new Date('2026-08-01');
       const endDate = new Date('2026-10-31');
       
-      let currentMonth = -1;
       let weekIdCounter = 1;
       let currentWeek = null;
 
@@ -261,14 +260,18 @@
 
         const month = d.getMonth() + 1;
         
-        if (month !== currentMonth) {
-          currentMonth = month;
-          currentWeek = { id: `week_${currentMonth}_${weekIdCounter++}`, month: currentMonth, dates: [] };
-          weeks.push(currentWeek);
-        } else if (dayOfWeek === 1 && currentWeek.dates.length > 0) {
-          currentWeek = { id: `week_${currentMonth}_${weekIdCounter++}`, month: currentMonth, dates: [] };
+        // 月曜日、または最初の日の場合に新しい週を作成 (月を跨いでも同じ週とする)
+        if (!currentWeek || dayOfWeek === 1) {
+          const yyyy = d.getFullYear();
+          currentWeek = { 
+            id: `week_${yyyy}_${month}_${weekIdCounter++}`, 
+            months: new Set(), 
+            dates: [] 
+          };
           weeks.push(currentWeek);
         }
+        
+        currentWeek.months.add(month);
         
         const yyyy = d.getFullYear();
         const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -277,6 +280,7 @@
       }
 
       weeks.forEach(week => {
+        week.months = Array.from(week.months);
         if (week.dates.length > 0) {
           const firstDate = new Date(week.dates[0]);
           const lastDate = new Date(week.dates[week.dates.length - 1]);
@@ -292,7 +296,9 @@
     };
     
     const weeksData = generateWeeks();
-    const months = [...new Set(weeksData.map(w => w.month))];
+    // 各週が持つ月のリストを展開して重複を排除しソートする
+    const months = [...new Set(weeksData.flatMap(w => w.months))].sort((a, b) => a - b);
+    
     const getDayName = (dateStr) => {
       const days = ['(日)', '(月)', '(火)', '(水)', '(木)', '(金)', '(土)'];
       return days[new Date(dateStr).getDay()];
@@ -529,7 +535,7 @@
       useEffect(() => {
         let initialDate = weeksData[0].dates[0];
         let initialWeekId = weeksData[0].id;
-        let initialMonth = weeksData[0].month;
+        let initialMonth = weeksData[0].months[0];
 
         const allDates = weeksData.flatMap(w => w.dates);
         
@@ -537,7 +543,8 @@
             initialDate = todayStr;
             const week = weeksData.find(w => w.dates.includes(todayStr));
             initialWeekId = week.id;
-            initialMonth = week.month;
+            const todayMonth = new Date(todayStr).getMonth() + 1;
+            initialMonth = week.months.includes(todayMonth) ? todayMonth : week.months[0];
         } else {
             const todayDateObj = new Date(todayStr);
             const futureDates = allDates.filter(d => new Date(d) >= todayDateObj);
@@ -545,7 +552,7 @@
                 initialDate = futureDates[0];
                 const week = weeksData.find(w => w.dates.includes(initialDate));
                 initialWeekId = week.id;
-                initialMonth = week.month;
+                initialMonth = week.months[0];
             }
         }
 
@@ -628,7 +635,7 @@
 
       const handleMonthChange = (month) => {
         setSelectedMonth(month);
-        const firstWeekOfMonth = weeksData.find(w => w.month === month);
+        const firstWeekOfMonth = weeksData.find(w => w.months.includes(month));
         handleWeekChange(firstWeekOfMonth.id);
       };
       const handleWeekChange = (weekId) => {
@@ -772,22 +779,46 @@
       };
 
       const handleExportExcel = async (type = 'week') => {
-        let dates = [];
+        let baseDates = [];
         let fileName = "";
 
         if (type === 'month') {
-           const monthWeeks = weeksData.filter(w => w.month === selectedMonth);
-           monthWeeks.forEach(w => dates.push(...w.dates));
+           const monthWeeks = weeksData.filter(w => w.months.includes(selectedMonth));
+           monthWeeks.forEach(w => baseDates.push(...w.dates));
            fileName = `業務変更表_${selectedMonth}月分.xlsx`;
         } else {
            const week = weeksData.find(w => w.id === selectedWeek);
-           dates = week.dates;
-           fileName = `業務変更表_${dates[0].replace(/-/g, '')}.xlsx`;
+           baseDates = week.dates;
+           fileName = `業務変更表_${baseDates[0].replace(/-/g, '')}.xlsx`;
         }
 
-        const exportSchedules = dates.map(d => pendingChanges[d] || schedules[d] || defaultSchedules[d]);
-        const exportDefaultSchedules = dates.map(d => defaultSchedules[d]);
-        const exportHolidays = dates.map(d => pendingHolidays[d] !== undefined ? pendingHolidays[d] : holidays[d]);
+        // 土日を含めた完全な週の日付リストを生成 (月曜〜日曜)
+        const exportDates = [];
+        if (baseDates.length > 0) {
+            const uniqueBaseDates = [...new Set(baseDates)].sort();
+            let current = new Date(uniqueBaseDates[0]);
+            let startDay = current.getDay();
+            let diffToMon = startDay === 0 ? -6 : 1 - startDay;
+            current.setDate(current.getDate() + diffToMon);
+
+            let last = new Date(uniqueBaseDates[uniqueBaseDates.length - 1]);
+            let endDay = last.getDay();
+            let diffToSun = endDay === 0 ? 0 : 7 - endDay;
+            last.setDate(last.getDate() + diffToSun);
+
+            for (let d = new Date(current); d <= last; d.setDate(d.getDate() + 1)) {
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                exportDates.push(`${yyyy}-${mm}-${dd}`);
+            }
+        }
+        
+        const dates = exportDates;
+
+        const exportSchedules = dates.map(d => pendingChanges[d] || schedules[d] || defaultSchedules[d] || null);
+        const exportDefaultSchedules = dates.map(d => defaultSchedules[d] || null);
+        const exportHolidays = dates.map(d => pendingHolidays[d] !== undefined ? pendingHolidays[d] : (holidays[d] || false));
         const exportOnCalls = dates.map(d => pendingOnCalls[d] !== undefined ? pendingOnCalls[d] : (onCalls[d] || {first: '', second: ''}));
         
         // --- ブースの並び順を日別表示（変更された配列）に合わせて計算 ---
@@ -862,14 +893,25 @@
           dateCell.alignment = { vertical: 'middle', horizontal: 'center' };
           dateCell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
 
-          const isHol = exportHolidays[i];
+          const dayOfWeek = new Date(d).getDay();
+          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+          const isHol = isWeekend ? false : exportHolidays[i];
+
+          if (dayOfWeek === 6) {
+             dateCell.font = { color: { argb: 'FF2563EB' } }; // blue-600
+          } else if (dayOfWeek === 0 || isHol) {
+             dateCell.font = { color: { argb: 'FFE11D48' } }; // rose-600
+          }
+
           const currentOnCall = exportOnCalls[i];
 
           // 1st Call / 2nd Call
           const firstCallCell = row.getCell(2);
           firstCallCell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
           firstCallCell.alignment = { vertical: 'middle', horizontal: 'center' };
-          if (!isHol && currentOnCall.first) {
+          if (isWeekend) {
+              firstCallCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+          } else if (!isHol && currentOnCall?.first) {
              firstCallCell.value = currentOnCall.first;
              firstCallCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFCE7F3' } }; // pink-100
              firstCallCell.font = { color: { argb: 'FF9D174D' }, bold: true }; // pink-800
@@ -878,7 +920,9 @@
           const secondCallCell = row.getCell(3);
           secondCallCell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
           secondCallCell.alignment = { vertical: 'middle', horizontal: 'center' };
-          if (!isHol && currentOnCall.second) {
+          if (isWeekend) {
+              secondCallCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+          } else if (!isHol && currentOnCall?.second) {
              secondCallCell.value = currentOnCall.second;
              secondCallCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } }; // sky-100
              secondCallCell.font = { color: { argb: 'FF0369A1' }, bold: true }; // sky-800
@@ -889,20 +933,30 @@
             cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
             cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
 
+            if (isWeekend) {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+              return;
+            }
+
             if (isHol) {
               if (role === '休暇者') {
                  cell.value = "休診日";
                  cell.font = { color: { argb: 'FFE11D48' }, bold: true };
                  cell.alignment = { vertical: 'middle', horizontal: 'center' };
               }
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF1F2' } }; // rose-50
               return;
             }
 
             const dayData = exportSchedules[i];
             const defaultDayData = exportDefaultSchedules[i];
             
-            const currentItem = dayData.find(item => item.role === role);
-            const defaultItem = defaultDayData.find(item => item.role === role);
+            if (!dayData && !defaultDayData) {
+               return; 
+            }
+
+            const currentItem = dayData ? dayData.find(item => item.role === role) : null;
+            const defaultItem = defaultDayData ? defaultDayData.find(item => item.role === role) : null;
             
             const currentStaff = currentItem ? currentItem.staff : "";
             const defaultStaff = defaultItem ? defaultItem.staff : "";
@@ -926,15 +980,15 @@
             } else if (isNewBooth) {
               cell.value = {
                   richText: [
-                      { font: { color: { argb: 'FFFF0000' }, bold: true }, text: `【追加枠】\n` },
-                      { font: { color: { argb: 'FFFF0000' }, bold: true }, text: currentStaff }
+                      { font: { color: { argb: 'FFFF0000' }, bold: true, size: 9 }, text: `【追加枠】\n` },
+                      { font: { color: { argb: 'FFFF0000' }, bold: true, size: 11 }, text: currentStaff }
                   ]
               };
             } else if (currentStaff !== defaultStaff) {
               cell.value = {
                   richText: [
-                      { font: { color: { argb: fontColor } }, text: `旧: ${defaultStaff}\n` },
-                      { font: { color: { argb: 'FFFF0000' }, bold: true }, text: `新: ${currentStaff}` }
+                      { font: { color: { argb: fontColor }, size: 9 }, text: `旧: ${defaultStaff}\n` },
+                      { font: { color: { argb: 'FFFF0000' }, bold: true, size: 11 }, text: `新: ${currentStaff}` }
                   ]
               };
             } else {
@@ -1370,7 +1424,7 @@
 
               <div className="flex justify-between items-center mb-1 gap-2 flex-wrap">
                 <div className="flex overflow-x-auto gap-1 hide-scrollbar">
-                  {weeksData.filter(w => w.month === selectedMonth).map((week) => (
+                  {weeksData.filter(w => w.months.includes(selectedMonth)).map((week) => (
                     <button
                       key={week.id}
                       onClick={() => handleWeekChange(week.id)}
@@ -2013,5 +2067,3 @@
   </script>
 </body>
 </html>
-
-
