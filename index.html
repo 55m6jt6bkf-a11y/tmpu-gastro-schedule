@@ -595,7 +595,14 @@
                 setHolidays(prev => ({ ...prev, [dateKey]: data.isHoliday !== undefined ? data.isHoliday : defaultHolidays[dateKey] }));
                 setOnCalls(prev => ({ ...prev, [dateKey]: data.onCallData || { first: '', second: '' } }));
                 setNotices(prev => ({ ...prev, [dateKey]: data.notice || '' }));
-                setSchedulesMetadata(prev => ({ ...prev, [dateKey]: { updatedAt: data.updatedAt, updatedBy: data.updatedBy } }));
+                setSchedulesMetadata(prev => ({ 
+                  ...prev, 
+                  [dateKey]: { 
+                    updatedAt: data.updatedAt, 
+                    updatedBy: data.updatedBy,
+                    lastChanges: data.lastChanges || []
+                  } 
+                }));
               } else {
                 setSchedules(prev => ({ ...prev, [dateKey]: defaultSchedules[dateKey] }));
                 setHolidays(prev => ({ ...prev, [dateKey]: defaultHolidays[dateKey] }));
@@ -718,16 +725,71 @@
           
           const promises = Array.from(changedDates).map(dateKey => {
             const docRef = doc(schedulesRef, dateKey);
-            const staffData = pendingChanges[dateKey] ? pendingChanges[dateKey] : schedules[dateKey];
-            const isHol = pendingHolidays[dateKey] !== undefined ? pendingHolidays[dateKey] : holidays[dateKey];
-            const onCallDataToSave = pendingOnCalls[dateKey] !== undefined ? pendingOnCalls[dateKey] : (onCalls[dateKey] || {first: '', second: ''});
-            const noticeToSave = pendingNotices[dateKey] !== undefined ? pendingNotices[dateKey] : (notices[dateKey] || '');
+            const oldStaffData = schedules[dateKey] || defaultSchedules[dateKey];
+            const newStaffData = pendingChanges[dateKey] ? pendingChanges[dateKey] : oldStaffData;
             
+            const oldHol = holidays[dateKey];
+            const newHol = pendingHolidays[dateKey] !== undefined ? pendingHolidays[dateKey] : oldHol;
+            
+            const oldOnCall = onCalls[dateKey] || {first: '', second: ''};
+            const newOnCall = pendingOnCalls[dateKey] !== undefined ? pendingOnCalls[dateKey] : oldOnCall;
+            
+            const oldNotice = notices[dateKey] || '';
+            const newNotice = pendingNotices[dateKey] !== undefined ? pendingNotices[dateKey] : oldNotice;
+
+            const changes = [];
+
+            // 休診日の変更
+            if (oldHol !== newHol) {
+              changes.push(newHol ? '休診日に設定しました' : '休診日を解除しました');
+            }
+
+            // OnCallの変更
+            if (oldOnCall.first !== newOnCall.first) {
+              changes.push(`「1st Call」を ${oldOnCall.first || '未設定'} から ${newOnCall.first || '未設定'} に変更`);
+            }
+            if (oldOnCall.second !== newOnCall.second) {
+              changes.push(`「2nd Call」を ${oldOnCall.second || '未設定'} から ${newOnCall.second || '未設定'} に変更`);
+            }
+
+            // お知らせの変更
+            if (oldNotice !== newNotice) {
+              changes.push(`お知らせを更新しました`);
+            }
+
+            // ブースの変更差分
+            newStaffData.forEach((newItem, i) => {
+              const oldItem = oldStaffData[i];
+              if (!oldItem) {
+                changes.push(`「${newItem.role}」枠を追加（担当: ${newItem.staff || '未設定'}）`);
+              } else if (oldItem.role !== newItem.role || oldItem.staff !== newItem.staff) {
+                if (oldItem.role === newItem.role) {
+                  if (newItem.role === '休暇者') {
+                    changes.push(`休暇者を「${oldItem.staff || 'なし'}」から「${newItem.staff || 'なし'}」に変更`);
+                  } else {
+                    changes.push(`「${newItem.role}」の担当を ${oldItem.staff || '未設定'} から ${newItem.staff || '未設定'} に変更`);
+                  }
+                } else {
+                  changes.push(`枠${i}: 「${oldItem.role}」(${oldItem.staff}) を 「${newItem.role}」(${newItem.staff}) に変更`);
+                }
+              }
+            });
+            if (oldStaffData.length > newStaffData.length) {
+              for (let i = newStaffData.length; i < oldStaffData.length; i++) {
+                changes.push(`「${oldStaffData[i].role}」枠を削除`);
+              }
+            }
+
+            if (changes.length === 0 && pendingChanges[dateKey]) {
+              changes.push('枠の順序などを変更しました');
+            }
+
             return setDoc(docRef, {
-              staffData: JSON.stringify(staffData),
-              isHoliday: isHol,
-              onCallData: onCallDataToSave,
-              notice: noticeToSave,
+              staffData: JSON.stringify(newStaffData),
+              isHoliday: newHol,
+              onCallData: newOnCall,
+              notice: newNotice,
+              lastChanges: changes,
               updatedAt: new Date().toISOString(),
               updatedBy: user.uid
             }, { merge: true });
@@ -1988,7 +2050,7 @@
 
           {showHistoryModal && (
             <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm print:hidden">
-              <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                 <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-slate-50">
                   <h3 className="font-bold text-base flex items-center gap-1.5 text-slate-800">
                     <IconClock className="w-5 h-5 text-blue-600" />
@@ -2009,7 +2071,8 @@
                       .map(([date, meta]) => ({
                         date,
                         updatedAt: new Date(meta.updatedAt),
-                        updatedBy: meta.updatedBy
+                        updatedBy: meta.updatedBy,
+                        changes: meta.lastChanges || []
                       }))
                       .sort((a, b) => b.updatedAt - a.updatedAt);
                       
@@ -2022,22 +2085,30 @@
                         <table className="w-full text-sm text-left">
                           <thead className="bg-slate-100 border-b border-slate-200 text-slate-600">
                             <tr>
-                              <th className="p-3 font-bold">更新日時</th>
-                              <th className="p-3 font-bold">対象日</th>
-                              <th className="p-3 font-bold hidden sm:table-cell">更新者ID</th>
+                              <th className="p-3 font-bold w-36">更新日時</th>
+                              <th className="p-3 font-bold w-24">対象日</th>
+                              <th className="p-3 font-bold">変更内容</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                             {historyList.map(item => (
                               <tr key={item.date} className="hover:bg-slate-50 transition-colors">
-                                <td className="p-3 whitespace-nowrap text-slate-700 font-medium">
+                                <td className="p-3 whitespace-nowrap text-slate-700 font-medium align-top">
                                   {item.updatedAt.toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                                 </td>
-                                <td className="p-3 font-bold text-slate-800">
-                                  {item.date.replace(/-/g, '/')} {getDayName(item.date)}
+                                <td className="p-3 font-bold text-slate-800 align-top">
+                                  {item.date.replace(/-/g, '/')} <br className="sm:hidden"/>{getDayName(item.date)}
                                 </td>
-                                <td className="p-3 text-[10px] text-slate-400 font-mono hidden sm:table-cell">
-                                  {item.updatedBy || '不明'}
+                                <td className="p-3 text-slate-700 align-top">
+                                  {item.changes.length > 0 ? (
+                                    <ul className="list-disc pl-4 space-y-1">
+                                      {item.changes.map((change, i) => (
+                                        <li key={i}>{change}</li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <span className="text-slate-400">（具体的な変更記録なし）</span>
+                                  )}
                                 </td>
                               </tr>
                             ))}
