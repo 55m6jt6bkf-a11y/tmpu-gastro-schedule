@@ -163,6 +163,7 @@
 
     const ALLOWED_ONCALL_ROLES = ['EGD①', 'EGD②', 'EGD③', 'EUS', 'CS①', 'CS②', '午後CS', '専攻医AUS', 'back up', '上部EUS'];
 
+    // 新旧すべての役割名を網羅
     const MASTER_ROLE_ORDER = [
       '休暇者',
       '新患①', '新患②', '新患③', '新患④',
@@ -171,14 +172,15 @@
       'CS①', 'CS②', '透視CS', '午後CS',
       '専攻医AUS',
       'back up',
-      '若林EGD', '仙台健診', '一番町', '涌谷', '若林CS',
-      '刈田病院', '真壁病院', '矢本内科',
-      '健診プラザ', '渡辺病院', '佐藤胃腸外科', 'ゆうファミリー',
-      '女川EGD&CS', '高砂内科', '循環器センター',
-      '葵会EGD', '米谷病院'
+      '若林EGD', '仙台健診', '一番町', '一番町EGD', '涌谷', '涌谷病院', '若林CS',
+      '刈田病院', '真壁病院', '矢本内科', '南相馬EGD',
+      '健診プラザ', '健診プラザEGD', '渡辺病院', '佐藤胃腸外科', 'ゆうファミリー',
+      '女川EGD&CS', '高砂内科', '循環器センター', '循環器病センターEGD',
+      '葵会EGD', '米谷病院', '豊里病院当直'
     ];
 
-    const monthlyPatterns = [
+    // --- 旧パターン（〜9月30日） ---
+    const monthlyPatternsUntilSep = [
       // 第1週
       [
         // 月
@@ -246,10 +248,80 @@
       ]
     ];
 
+    // --- 新パターン（10月1日以降） ---
+    const monthlyPatternsFromOct = [
+      // 第1週
+      [
+        // 月
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '髙橋' }, { role: '新患②', staff: '猪股' }, { role: '新患③', staff: '齋藤' }, { role: 'EGD①', staff: '吉野・竹本' }, { role: 'EGD②', staff: '早川' }, { role: 'EGD③', staff: '福士・瓜田宗' }, { role: 'EUS', staff: '小岩井・伊藤・瓜田愛' }, { role: 'CS①', staff: '及川・田島' }, { role: 'CS②', staff: '遠藤・八子・山田陽' }, { role: '専攻医AUS', staff: '巽' }, { role: 'back up', staff: '木内' }, { role: '若林EGD', staff: '目黒・山田潤' }, { role: '仙台健診', staff: '廣田' }, { role: '一番町EGD', staff: '宮下' }, { role: '涌谷病院', staff: '大沼' }, { role: '若林CS', staff: '吉野・さやか' } ],
+        // 火
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '金' }, { role: '新患②', staff: '早川' }, { role: '新患③', staff: '田島' }, { role: '新患④', staff: '八子' }, { role: 'EGD①', staff: '及川・木内' }, { role: 'EGD②', staff: '永井' }, { role: 'EGD③', staff: '猪股・瓜田愛' }, { role: 'EUS', staff: '廣田・髙橋・齋藤・巽' }, { role: 'CS①', staff: '吉野・竹本' }, { role: 'CS②', staff: '伊藤・瓜田宗' }, { role: '専攻医AUS', staff: '山田陽' }, { role: 'back up', staff: '' }, { role: '若林EGD', staff: '小暮・目黒・宮下' }, { role: '刈田病院', staff: '佐々木' }, { role: '真壁病院', staff: '巽or齋藤or八子or山田陽' }, { role: '矢本内科', staff: '賢一' }, { role: '南相馬EGD', staff: '山田潤' }, { role: '若林CS', staff: '近藤' } ],
+        // 水
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '永井' }, { role: '新患②', staff: '宮下' }, { role: '新患③', staff: '瓜田愛' }, { role: 'EGD①', staff: '早川・八子・山田陽' }, { role: 'EGD②', staff: '大沼' }, { role: 'EGD③', staff: '小岩井・木内' }, { role: 'EUS', staff: '猪股・竹本・齋藤・巽' }, { role: 'CS①', staff: '遠藤・田島' }, { role: 'CS②', staff: '金・瓜田宗' }, { role: '専攻医AUS', staff: '' }, { role: 'back up', staff: '' }, { role: '若林EGD', staff: '廣田・木村・賢一' }, { role: '刈田病院', staff: '髙橋' }, { role: '健診プラザEGD', staff: '吉野' }, { role: '渡辺病院', staff: '高須' }, { role: '佐藤胃腸外科', staff: '目黒' }, { role: '若林CS', staff: '翔太郎' } ],
+        // 木
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '伊藤' }, { role: '新患②', staff: '瓜田宗' }, { role: '新患③', staff: '竹本' }, { role: 'EGD①', staff: '及川・田島' }, { role: 'EGD②', staff: '福士' }, { role: 'EGD③', staff: '髙橋・八子・山田陽' }, { role: 'EUS', staff: '' }, { role: '上部EUS', staff: '福士・大沼' }, { role: 'CS①', staff: '永井・木内' }, { role: 'CS②', staff: '石川・齋藤・巽' }, { role: '透視CS', staff: '吉野' }, { role: '午後CS', staff: '大沼・髙橋・1年目' }, { role: '専攻医AUS', staff: '2年目' }, { role: 'back up', staff: '大沼・瓜田愛' }, { role: '若林EGD', staff: '山田潤・内海・小岩井' }, { role: '健診プラザEGD', staff: '小暮' }, { role: '女川EGD&CS', staff: '金' }, { role: '高砂内科', staff: '遠藤' }, { role: '若林CS', staff: '近藤・永井' }, { role: '循環器病センターEGD', staff: '早川' } ],
+        // 金
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '大沼' }, { role: '新患②', staff: '及川' }, { role: '新患③', staff: '木内' }, { role: 'EGD①', staff: '永井・齋藤・巽' }, { role: 'EGD②', staff: '早川' }, { role: 'EGD③', staff: '髙橋・八子・山田陽' }, { role: 'EUS', staff: '宮下・田島' }, { role: 'CS①', staff: '猪股・竹本' }, { role: 'CS②', staff: '' }, { role: '午後CS', staff: '早川・髙橋・1年目' }, { role: '専攻医AUS', staff: '2年目' }, { role: 'back up', staff: '廣田・小暮・瓜田宗' }, { role: '葵会EGD', staff: '福士' }, { role: '若林EGD', staff: '高須・目黒・小岩井' }, { role: '刈田病院', staff: '伊藤' }, { role: '渡辺病院', staff: '遠藤' }, { role: '一番町EGD', staff: '金' }, { role: '米谷病院', staff: '巽or齋藤or八子or山田陽' }, { role: '若林CS', staff: '山田潤・さやか' }, { role: '循環器病センターEGD', staff: '猪股' }, { role: '豊里病院当直', staff: '' } ]
+      ],
+      // 第2週
+      [
+        // 月
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '髙橋' }, { role: '新患②', staff: '猪股' }, { role: '新患③', staff: '巽' }, { role: 'EGD①', staff: '吉野・田島' }, { role: 'EGD②', staff: '大沼' }, { role: 'EGD③', staff: '福士・瓜田宗' }, { role: 'EUS', staff: '小岩井・宮下・木内' }, { role: 'CS①', staff: '永井・瓜田愛' }, { role: 'CS②', staff: '遠藤・八子・山田陽' }, { role: '専攻医AUS', staff: '齋藤' }, { role: 'back up', staff: '' }, { role: '若林EGD', staff: '目黒・山田潤' }, { role: '仙台健診', staff: '廣田' }, { role: '一番町EGD', staff: '伊藤' }, { role: '涌谷病院', staff: '早川' }, { role: '若林CS', staff: '吉野・さやか' } ],
+        // 火
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '金' }, { role: '新患②', staff: '早川' }, { role: '新患③', staff: '田島' }, { role: '新患④', staff: '山田陽' }, { role: 'EGD①', staff: '髙橋・木内' }, { role: 'EGD②', staff: '永井' }, { role: 'EGD③', staff: '大沼・瓜田愛' }, { role: 'EUS', staff: '廣田・及川' }, { role: 'CS①', staff: '吉野・巽' }, { role: 'CS②', staff: '宮下・齋藤' }, { role: '専攻医AUS', staff: '八子' }, { role: 'back up', staff: '竹本' }, { role: '若林EGD', staff: '小暮・目黒・伊藤' }, { role: '刈田病院', staff: '佐々木' }, { role: '真壁病院', staff: '巽or齋藤or八子or山田' }, { role: '矢本内科', staff: '賢一' }, { role: '南相馬EGD', staff: '猪股' }, { role: '若林CS', staff: '近藤' } ],
+        // 水
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '永井' }, { role: '新患②', staff: '宮下' }, { role: '新患③', staff: '瓜田愛' }, { role: 'EGD①', staff: '早川・竹本' }, { role: 'EGD②', staff: '金' }, { role: 'EGD③', staff: '大沼・瓜田宗' }, { role: 'EUS', staff: '猪股・山田・八子' }, { role: 'CS①', staff: '遠藤・齋藤・巽' }, { role: 'CS②', staff: '小岩井・木内' }, { role: '専攻医AUS', staff: '' }, { role: 'back up', staff: '田島' }, { role: '若林EGD', staff: '廣田・木村・賢一' }, { role: '刈田病院', staff: '及川' }, { role: '健診プラザEGD', staff: '吉野' }, { role: '渡辺病院', staff: '高須' }, { role: '佐藤胃腸外科', staff: '目黒' }, { role: '若林CS', staff: '翔太郎' }, { role: 'ゆうファミリー', staff: '瓜田宗or瓜田愛or竹本or田島or木内' } ],
+        // 木
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '伊藤' }, { role: '新患②', staff: '瓜田宗' }, { role: '新患③', staff: '竹本' }, { role: 'EGD①', staff: '永井・田島' }, { role: 'EGD②', staff: '福士' }, { role: 'EGD③', staff: '髙橋・瓜田愛' }, { role: 'EUS', staff: '猪股' }, { role: '上部EUS', staff: '福士・早川' }, { role: 'CS①', staff: '大沼・八子・山田陽' }, { role: 'CS②', staff: '早川・齋藤・巽・（吉野）' }, { role: '透視CS', staff: '' }, { role: '午後CS', staff: '早川・及川・1年目' }, { role: '専攻医AUS', staff: '2年目' }, { role: 'back up', staff: '及川' }, { role: '若林EGD', staff: '山田潤・内海・小岩井' }, { role: '健診プラザEGD', staff: '小暮' }, { role: '女川EGD&CS', staff: '金' }, { role: '高砂内科', staff: '遠藤' }, { role: '若林CS', staff: '近藤・大沼' }, { role: '循環器病センターEGD', staff: '髙橋' } ],
+        // 金
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '大沼' }, { role: '新患②', staff: '及川' }, { role: '新患③', staff: '木内' }, { role: 'EGD①', staff: '永井・齋藤・巽' }, { role: 'EGD②', staff: '宮下' }, { role: 'EGD③', staff: '髙橋・竹本' }, { role: 'EUS', staff: '伊藤・瓜田宗・八子・山田陽' }, { role: 'CS①', staff: '早川・瓜田愛' }, { role: 'CS②', staff: '' }, { role: '午後CS', staff: '早川・髙橋・1年目' }, { role: '専攻医AUS', staff: '2年目' }, { role: 'back up', staff: '廣田・小暮' }, { role: '葵会EGD', staff: '福士' }, { role: '若林EGD', staff: '高須・目黒・小岩井' }, { role: '刈田病院', staff: '猪股' }, { role: '渡辺病院', staff: '遠藤' }, { role: '一番町EGD', staff: '金' }, { role: '米谷病院', staff: '巽or齋藤or八子or山田陽' }, { role: '若林CS', staff: '山田潤・さやか' }, { role: '循環器病センターEGD', staff: '宮下' }, { role: '豊里病院当直', staff: '' } ]
+      ],
+      // 第3週
+      [
+        // 月
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '髙橋' }, { role: '新患②', staff: '猪股' }, { role: '新患③', staff: '齋藤' }, { role: 'EGD①', staff: '吉野・竹本' }, { role: 'EGD②', staff: '早川' }, { role: 'EGD③', staff: '福士・瓜田宗' }, { role: 'EUS', staff: '小岩井・伊藤・瓜田愛' }, { role: 'CS①', staff: '及川・田島' }, { role: 'CS②', staff: '遠藤・八子・山田陽' }, { role: '専攻医AUS', staff: '巽' }, { role: 'back up', staff: '木内' }, { role: '若林EGD', staff: '目黒・山田潤' }, { role: '仙台健診', staff: '廣田' }, { role: '一番町EGD', staff: '宮下' }, { role: '涌谷病院', staff: '大沼' }, { role: '若林CS', staff: '吉野・さやか' } ],
+        // 火
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '金' }, { role: '新患②', staff: '早川' }, { role: '新患③', staff: '田島' }, { role: '新患④', staff: '八子' }, { role: 'EGD①', staff: '及川・木内' }, { role: 'EGD②', staff: '永井' }, { role: 'EGD③', staff: '猪股・瓜田愛' }, { role: 'EUS', staff: '廣田・髙橋・齋藤・巽' }, { role: 'CS①', staff: '吉野・竹本' }, { role: 'CS②', staff: '伊藤・瓜田宗' }, { role: '専攻医AUS', staff: '山田陽' }, { role: 'back up', staff: '' }, { role: '若林EGD', staff: '小暮・目黒・宮下' }, { role: '刈田病院', staff: '佐々木' }, { role: '真壁病院', staff: '巽or齋藤or八子or山田陽' }, { role: '矢本内科', staff: '賢一' }, { role: '南相馬EGD', staff: '山田潤' }, { role: '若林CS', staff: '近藤' } ],
+        // 水
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '永井' }, { role: '新患②', staff: '宮下' }, { role: '新患③', staff: '瓜田愛' }, { role: 'EGD①', staff: '早川・八子・山田陽' }, { role: 'EGD②', staff: '大沼' }, { role: 'EGD③', staff: '小岩井・木内' }, { role: 'EUS', staff: '猪股・竹本・齋藤・巽' }, { role: 'CS①', staff: '遠藤・田島' }, { role: 'CS②', staff: '金・瓜田宗' }, { role: '専攻医AUS', staff: '' }, { role: 'back up', staff: '' }, { role: '若林EGD', staff: '廣田・木村・賢一' }, { role: '刈田病院', staff: '髙橋' }, { role: '健診プラザEGD', staff: '吉野' }, { role: '渡辺病院', staff: '高須' }, { role: '佐藤胃腸外科', staff: '目黒' }, { role: '若林CS', staff: '翔太郎' } ],
+        // 木
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '伊藤' }, { role: '新患②', staff: '瓜田宗' }, { role: '新患③', staff: '竹本' }, { role: 'EGD①', staff: '及川・田島' }, { role: 'EGD②', staff: '福士' }, { role: 'EGD③', staff: '髙橋・八子・山田陽' }, { role: 'EUS', staff: '' }, { role: '上部EUS', staff: '福士・大沼' }, { role: 'CS①', staff: '永井・木内' }, { role: 'CS②', staff: '石川・齋藤・巽' }, { role: '透視CS', staff: '吉野' }, { role: '午後CS', staff: '大沼・髙橋・1年目' }, { role: '専攻医AUS', staff: '2年目' }, { role: 'back up', staff: '大沼・瓜田愛' }, { role: '若林EGD', staff: '山田潤・内海・小岩井' }, { role: '健診プラザEGD', staff: '小暮' }, { role: '女川EGD&CS', staff: '金' }, { role: '高砂内科', staff: '遠藤' }, { role: '若林CS', staff: '近藤・永井' }, { role: '循環器病センターEGD', staff: '早川' } ],
+        // 金
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '大沼' }, { role: '新患②', staff: '及川' }, { role: '新患③', staff: '木内' }, { role: 'EGD①', staff: '永井・齋藤・巽' }, { role: 'EGD②', staff: '早川' }, { role: 'EGD③', staff: '髙橋・八子・山田陽' }, { role: 'EUS', staff: '宮下・田島' }, { role: 'CS①', staff: '猪股・竹本' }, { role: 'CS②', staff: '' }, { role: '午後CS', staff: '早川・髙橋・1年目' }, { role: '専攻医AUS', staff: '2年目' }, { role: 'back up', staff: '廣田・小暮・瓜田宗' }, { role: '葵会EGD', staff: '福士' }, { role: '若林EGD', staff: '高須・目黒・小岩井' }, { role: '刈田病院', staff: '伊藤' }, { role: '渡辺病院', staff: '遠藤' }, { role: '一番町EGD', staff: '金' }, { role: '米谷病院', staff: '巽or齋藤or八子or山田陽' }, { role: '若林CS', staff: '山田潤・さやか' }, { role: '循環器病センターEGD', staff: '猪股' }, { role: '豊里病院当直', staff: '' } ]
+      ],
+      // 第4週
+      [
+        // 月
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '髙橋' }, { role: '新患②', staff: '猪股' }, { role: '新患③', staff: '巽' }, { role: 'EGD①', staff: '吉野・田島' }, { role: 'EGD②', staff: '大沼' }, { role: 'EGD③', staff: '福士・瓜田宗' }, { role: 'EUS', staff: '小岩井・宮下・木内' }, { role: 'CS①', staff: '永井・瓜田愛' }, { role: 'CS②', staff: '遠藤・八子・山田陽' }, { role: '専攻医AUS', staff: '齋藤' }, { role: 'back up', staff: '' }, { role: '若林EGD', staff: '目黒・山田潤' }, { role: '仙台健診', staff: '廣田' }, { role: '一番町EGD', staff: '伊藤' }, { role: '涌谷病院', staff: '早川' }, { role: '若林CS', staff: '吉野・さやか' } ],
+        // 火
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '金' }, { role: '新患②', staff: '早川' }, { role: '新患③', staff: '田島' }, { role: '新患④', staff: '山田陽' }, { role: 'EGD①', staff: '髙橋・木内' }, { role: 'EGD②', staff: '永井' }, { role: 'EGD③', staff: '大沼・瓜田愛' }, { role: 'EUS', staff: '廣田・及川' }, { role: 'CS①', staff: '吉野・巽' }, { role: 'CS②', staff: '宮下・齋藤' }, { role: '専攻医AUS', staff: '八子' }, { role: 'back up', staff: '竹本' }, { role: '若林EGD', staff: '小暮・目黒・伊藤' }, { role: '刈田病院', staff: '佐々木' }, { role: '真壁病院', staff: '巽or齋藤or八子or山田' }, { role: '矢本内科', staff: '賢一' }, { role: '南相馬EGD', staff: '猪股' }, { role: '若林CS', staff: '近藤' } ],
+        // 水
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '永井' }, { role: '新患②', staff: '宮下' }, { role: '新患③', staff: '瓜田愛' }, { role: 'EGD①', staff: '早川・竹本' }, { role: 'EGD②', staff: '金' }, { role: 'EGD③', staff: '大沼・瓜田宗' }, { role: 'EUS', staff: '猪股・山田・八子' }, { role: 'CS①', staff: '遠藤・齋藤・巽' }, { role: 'CS②', staff: '小岩井・木内' }, { role: '専攻医AUS', staff: '' }, { role: 'back up', staff: '田島' }, { role: '若林EGD', staff: '廣田・木村・賢一' }, { role: '刈田病院', staff: '及川' }, { role: '健診プラザEGD', staff: '吉野' }, { role: '渡辺病院', staff: '高須' }, { role: '佐藤胃腸外科', staff: '目黒' }, { role: '若林CS', staff: '翔太郎' }, { role: 'ゆうファミリー', staff: '瓜田宗or瓜田愛or竹本or田島or木内' } ],
+        // 木
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '伊藤' }, { role: '新患②', staff: '瓜田宗' }, { role: '新患③', staff: '竹本' }, { role: 'EGD①', staff: '永井・田島' }, { role: 'EGD②', staff: '福士' }, { role: 'EGD③', staff: '髙橋・瓜田愛' }, { role: 'EUS', staff: '猪股' }, { role: '上部EUS', staff: '福士・早川' }, { role: 'CS①', staff: '大沼・八子・山田陽' }, { role: 'CS②', staff: '早川・齋藤・巽・（吉野）' }, { role: '透視CS', staff: '' }, { role: '午後CS', staff: '早川・及川・1年目' }, { role: '専攻医AUS', staff: '2年目' }, { role: 'back up', staff: '及川' }, { role: '若林EGD', staff: '山田潤・内海・小岩井' }, { role: '健診プラザEGD', staff: '小暮' }, { role: '女川EGD&CS', staff: '金' }, { role: '高砂内科', staff: '遠藤' }, { role: '若林CS', staff: '近藤・大沼' }, { role: '循環器病センターEGD', staff: '髙橋' } ],
+        // 金
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '大沼' }, { role: '新患②', staff: '及川' }, { role: '新患③', staff: '木内' }, { role: 'EGD①', staff: '永井・齋藤・巽' }, { role: 'EGD②', staff: '宮下' }, { role: 'EGD③', staff: '髙橋・竹本' }, { role: 'EUS', staff: '伊藤・瓜田宗・八子・山田陽' }, { role: 'CS①', staff: '早川・瓜田愛' }, { role: 'CS②', staff: '' }, { role: '午後CS', staff: '早川・髙橋・1年目' }, { role: '専攻医AUS', staff: '2年目' }, { role: 'back up', staff: '廣田・小暮' }, { role: '葵会EGD', staff: '福士' }, { role: '若林EGD', staff: '高須・目黒・小岩井' }, { role: '刈田病院', staff: '猪股' }, { role: '渡辺病院', staff: '遠藤' }, { role: '一番町EGD', staff: '金' }, { role: '米谷病院', staff: '巽or齋藤or八子or山田陽' }, { role: '若林CS', staff: '山田潤・さやか' }, { role: '循環器病センターEGD', staff: '宮下' }, { role: '豊里病院当直', staff: '' } ]
+      ],
+      // 第5週
+      [
+        // 月
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '髙橋' }, { role: '新患②', staff: '猪股' }, { role: '新患③', staff: '齋藤' }, { role: 'EGD①', staff: '吉野・竹本' }, { role: 'EGD②', staff: '早川' }, { role: 'EGD③', staff: '福士・瓜田宗' }, { role: 'EUS', staff: '小岩井・伊藤・瓜田愛' }, { role: 'CS①', staff: '及川・田島' }, { role: 'CS②', staff: '遠藤・八子・山田陽' }, { role: '専攻医AUS', staff: '巽' }, { role: 'back up', staff: '木内' }, { role: '若林EGD', staff: '目黒・山田潤' }, { role: '仙台健診', staff: '廣田' }, { role: '一番町EGD', staff: '宮下' }, { role: '涌谷病院', staff: '大沼' }, { role: '若林CS', staff: '吉野・さやか' } ],
+        // 火
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '金' }, { role: '新患②', staff: '早川' }, { role: '新患③', staff: '田島' }, { role: '新患④', staff: '八子' }, { role: 'EGD①', staff: '及川・木内' }, { role: 'EGD②', staff: '永井' }, { role: 'EGD③', staff: '猪股・瓜田愛' }, { role: 'EUS', staff: '廣田・髙橋・齋藤・巽' }, { role: 'CS①', staff: '吉野・竹本' }, { role: 'CS②', staff: '伊藤・瓜田宗' }, { role: '専攻医AUS', staff: '山田陽' }, { role: 'back up', staff: '' }, { role: '若林EGD', staff: '小暮・目黒・宮下' }, { role: '刈田病院', staff: '佐々木' }, { role: '真壁病院', staff: '巽or齋藤or八子or山田陽' }, { role: '矢本内科', staff: '賢一' }, { role: '南相馬EGD', staff: '山田潤' }, { role: '若林CS', staff: '近藤' } ],
+        // 水
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '永井' }, { role: '新患②', staff: '宮下' }, { role: '新患③', staff: '瓜田愛' }, { role: 'EGD①', staff: '早川・八子・山田陽' }, { role: 'EGD②', staff: '大沼' }, { role: 'EGD③', staff: '小岩井・木内' }, { role: 'EUS', staff: '猪股・竹本・齋藤・巽' }, { role: 'CS①', staff: '遠藤・田島' }, { role: 'CS②', staff: '金・瓜田宗' }, { role: '専攻医AUS', staff: '' }, { role: 'back up', staff: '' }, { role: '若林EGD', staff: '廣田・木村・賢一' }, { role: '刈田病院', staff: '髙橋' }, { role: '健診プラザEGD', staff: '吉野' }, { role: '渡辺病院', staff: '高須' }, { role: '佐藤胃腸外科', staff: '目黒' }, { role: '若林CS', staff: '翔太郎' } ],
+        // 木
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '伊藤' }, { role: '新患②', staff: '瓜田宗' }, { role: '新患③', staff: '竹本' }, { role: 'EGD①', staff: '及川・田島' }, { role: 'EGD②', staff: '福士' }, { role: 'EGD③', staff: '髙橋・八子・山田陽' }, { role: 'EUS', staff: '' }, { role: '上部EUS', staff: '福士・大沼' }, { role: 'CS①', staff: '永井・木内' }, { role: 'CS②', staff: '石川・齋藤・巽' }, { role: '透視CS', staff: '吉野' }, { role: '午後CS', staff: '大沼・髙橋・1年目' }, { role: '専攻医AUS', staff: '2年目' }, { role: 'back up', staff: '大沼・瓜田愛' }, { role: '若林EGD', staff: '山田潤・内海・小岩井' }, { role: '健診プラザEGD', staff: '小暮' }, { role: '女川EGD&CS', staff: '金' }, { role: '高砂内科', staff: '遠藤' }, { role: '若林CS', staff: '近藤・永井' }, { role: '循環器病センターEGD', staff: '早川' } ],
+        // 金
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '大沼' }, { role: '新患②', staff: '及川' }, { role: '新患③', staff: '木内' }, { role: 'EGD①', staff: '永井・齋藤・巽' }, { role: 'EGD②', staff: '早川' }, { role: 'EGD③', staff: '髙橋・八子・山田陽' }, { role: 'EUS', staff: '宮下・田島' }, { role: 'CS①', staff: '猪股・竹本' }, { role: 'CS②', staff: '' }, { role: '午後CS', staff: '早川・髙橋・1年目' }, { role: '専攻医AUS', staff: '2年目' }, { role: 'back up', staff: '廣田・小暮・瓜田宗' }, { role: '葵会EGD', staff: '福士' }, { role: '若林EGD', staff: '高須・目黒・小岩井' }, { role: '刈田病院', staff: '伊藤' }, { role: '渡辺病院', staff: '遠藤' }, { role: '一番町EGD', staff: '金' }, { role: '米谷病院', staff: '巽or齋藤or八子or山田陽' }, { role: '若林CS', staff: '山田潤・さやか' }, { role: '循環器病センターEGD', staff: '猪股' }, { role: '豊里病院当直', staff: '' } ]
+      ]
+    ];
+
     const generateWeeks = () => {
       const weeks = [];
+      // 8月から12月までに期間を拡張
       let startDate = new Date('2026-08-01');
-      const endDate = new Date('2026-10-31');
+      const endDate = new Date('2026-12-31');
       
       let weekIdCounter = 1;
       let currentWeek = null;
@@ -305,15 +377,24 @@
     };
     const getWeekOfMonthIndex = (date) => Math.floor((date.getDate() - 1) / 7);
 
+    // 日付に応じて旧・新のパターンを切り替えてデフォルトを生成
     const generateDefaultSchedules = () => {
       const result = {};
+      const splitDate = new Date('2026-10-01');
+
       weeksData.forEach((week) => {
         week.dates.forEach((dateStr) => {
           const d = new Date(dateStr);
           const weekIndex = getWeekOfMonthIndex(d);
           const dayIndex = d.getDay() - 1;
           if (dayIndex >= 0 && dayIndex <= 4 && weekIndex >= 0 && weekIndex <= 4) {
-             result[dateStr] = JSON.parse(JSON.stringify(monthlyPatterns[weekIndex][dayIndex]));
+             if (d < splitDate) {
+               // 9月30日までは古いパターン
+               result[dateStr] = JSON.parse(JSON.stringify(monthlyPatternsUntilSep[weekIndex][dayIndex]));
+             } else {
+               // 10月1日以降は新しいパターン
+               result[dateStr] = JSON.parse(JSON.stringify(monthlyPatternsFromOct[weekIndex][dayIndex]));
+             }
           }
         });
       });
@@ -343,7 +424,7 @@
     };
     const defaultNotices = generateDefaultNotices();
 
-    const PUBLIC_HOLIDAYS = ['2026-08-11', '2026-09-21', '2026-09-22', '2026-09-23', '2026-10-12'];
+    const PUBLIC_HOLIDAYS = ['2026-08-11', '2026-09-21', '2026-09-22', '2026-09-23', '2026-10-12', '2026-11-03', '2026-11-23'];
     const defaultHolidays = {};
     weeksData.forEach(week => {
       week.dates.forEach(d => {
@@ -355,7 +436,7 @@
       if (role === '休暇者') return 'bg-rose-100 text-rose-800 border-rose-300';
       if (isNewBooth) return 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-400 shadow-[0_0_10px_rgba(217,70,239,0.3)] ring-1 ring-fuchsia-300';
       
-      const externals = ['若林', '女川', '涌谷', '一番町', '健診', '刈田', '真壁', '矢本', '渡辺', '佐藤', 'ゆう', '高砂', '循環器', '葵会', '米谷'];
+      const externals = ['若林', '女川', '涌谷', '一番町', '健診', '刈田', '真壁', '矢本', '渡辺', '佐藤', 'ゆう', '高砂', '循環器', '葵会', '米谷', '南相馬', '豊里'];
       if (externals.some(kw => role.includes(kw))) return 'bg-stone-100 text-stone-700 border-stone-300'; 
       if (role.includes('新患')) return 'bg-emerald-50 text-emerald-800 border-emerald-200';
       if (role.includes('EGD')) return 'bg-blue-50 text-blue-800 border-blue-200';
@@ -375,7 +456,7 @@
       } else if (isNewBooth) {
         bgColor = 'FFFAEAFF'; // fuchsia-100
       } else {
-        const externals = ['若林', '女川', '涌谷', '一番町', '健診', '刈田', '真壁', '矢本', '渡辺', '佐藤', 'ゆう', '高砂', '循環器', '葵会', '米谷'];
+        const externals = ['若林', '女川', '涌谷', '一番町', '健診', '刈田', '真壁', '矢本', '渡辺', '佐藤', 'ゆう', '高砂', '循環器', '葵会', '米谷', '南相馬', '豊里'];
         if (externals.some(kw => role.includes(kw))) {
           bgColor = 'FFF5F5F4'; // stone-100
         } else if (role.includes('新患')) {
@@ -396,7 +477,7 @@
       return { bgColor, fontColor };
     };
 
-    const PM_BOOTHS = ['若林午後CS', '若林CS', '午後CS', 'ゆうファミリー', '循環器センター'];
+    const PM_BOOTHS = ['若林午後CS', '若林CS', '午後CS', 'ゆうファミリー', '循環器センター', '豊里病院当直', '循環器病センターEGD'];
     const getPeriod = (role) => (PM_BOOTHS.includes(role) || role.includes('午後')) ? 'PM' : 'AM';
     const VALID_EGD2_STAFF = ['福士', '片山', '金', '伊藤', '宮下', '大沼', '早川', '及川', '永井', '佐々木'];
 
