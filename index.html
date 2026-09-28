@@ -131,12 +131,13 @@
     const IconArrowDown = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 9 6 6 6-6"/></svg>;
     const IconMegaphone = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>;
     const IconFileText = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>;
+    const IconBarChart = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/></svg>;
 
     // 名前の純粋化: カッコ内に「潤」を含むものは残し、(AM)(午後)などは除去する
     const getPureName = (str) => {
       if (!str) return '';
       return str.replace(/[（\(](.*?)[）\)]/g, (match, p1) => {
-        if (p1.includes('潤')) return match;
+        if (p1.includes('潤') || p1.includes('陽')) return match;
         return '';
       }).trim();
     };
@@ -305,7 +306,7 @@
       // 第5週
       [
         // 月
-        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '髙橋' }, { role: '新患②', staff: '猪股' }, { role: '新患③', staff: '齋藤' }, { role: 'EGD①', staff: '吉野・竹本' }, { role: 'EGD②', staff: '早川' }, { role: 'EGD③', staff: '福士・瓜田宗' }, { role: 'EUS', staff: '小岩井・伊藤・瓜田愛' }, { role: 'CS①', staff: '及川・田島' }, { role: 'CS②', staff: '遠藤・八子・山田陽' }, { role: '専攻医AUS', staff: '巽' }, { role: 'back up', staff: '木内' }, { role: '若林EGD', staff: '目黒・山田潤' }, { role: '仙台健診', staff: '廣田' }, { role: '一番町EGD', staff: '宮下' }, { role: '涌谷病院', staff: '大沼' }, { role: '若林CS', staff: '吉野・さやか' } ],
+        [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '片山' }, { role: '新患②', staff: '猪股' }, { role: '新患③', staff: '齋藤' }, { role: 'EGD①', staff: '吉野・竹本' }, { role: 'EGD②', staff: '早川' }, { role: 'EGD③', staff: '福士・瓜田宗' }, { role: 'EUS', staff: '小岩井・伊藤・瓜田愛' }, { role: 'CS①', staff: '及川・田島' }, { role: 'CS②', staff: '遠藤・八子・山田陽' }, { role: '専攻医AUS', staff: '巽' }, { role: 'back up', staff: '木内' }, { role: '若林EGD', staff: '目黒・山田潤' }, { role: '仙台健診', staff: '廣田' }, { role: '一番町EGD', staff: '宮下' }, { role: '涌谷病院', staff: '大沼' }, { role: '若林CS', staff: '吉野・さやか' } ],
         // 火
         [ { role: '休暇者', staff: '' }, { role: '新患①', staff: '金' }, { role: '新患②', staff: '早川' }, { role: '新患③', staff: '田島' }, { role: '新患④', staff: '八子' }, { role: 'EGD①', staff: '及川・木内' }, { role: 'EGD②', staff: '永井' }, { role: 'EGD③', staff: '猪股・瓜田愛' }, { role: 'EUS', staff: '廣田・髙橋・齋藤・巽' }, { role: 'CS①', staff: '吉野・竹本' }, { role: 'CS②', staff: '伊藤・瓜田宗' }, { role: '専攻医AUS', staff: '山田陽' }, { role: 'back up', staff: '' }, { role: '若林EGD', staff: '小暮・目黒・宮下' }, { role: '刈田病院', staff: '佐々木' }, { role: '真壁病院', staff: '巽or齋藤or八子or山田陽' }, { role: '矢本内科', staff: '賢一' }, { role: '南相馬EGD', staff: '山田潤' }, { role: '若林CS', staff: '近藤' } ],
         // 水
@@ -437,7 +438,7 @@
       if (isNewBooth) return 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-400 shadow-[0_0_10px_rgba(217,70,239,0.3)] ring-1 ring-fuchsia-300';
       
       const pmBooths = ['若林CS', '循環器病センターEGD', 'ゆうファミリー'];
-      if (pmBooths.includes(role)) return 'bg-yellow-50 text-yellow-800 border-yellow-300';
+      if (pmBooths.includes(role)) return 'bg-violet-100 text-violet-800 border-violet-300'; // 午後枠の統一配色
 
       const externals = ['若林', '女川', '涌谷', '一番町', '健診', '刈田', '真壁', '矢本', '渡辺', '佐藤', 'ゆう', '高砂', '循環器', '葵会', '米谷', '南相馬', '豊里'];
       if (externals.some(kw => role.includes(kw))) return 'bg-stone-100 text-stone-700 border-stone-300'; 
@@ -463,7 +464,7 @@
         const pmBooths = ['若林CS', '循環器病センターEGD', 'ゆうファミリー'];
         const externals = ['若林', '女川', '涌谷', '一番町', '健診', '刈田', '真壁', '矢本', '渡辺', '佐藤', 'ゆう', '高砂', '循環器', '葵会', '米谷', '南相馬', '豊里'];
         if (pmBooths.includes(role)) {
-          bgColor = 'FFFEFCE8'; // yellow-50
+          bgColor = 'FFEDE9FE'; // violet-100 (午後枠用)
         } else if (externals.some(kw => role.includes(kw))) {
           bgColor = 'FFF5F5F4'; // stone-100
         } else if (role === '再診(片山)') {
@@ -532,14 +533,19 @@
       return conflicts;
     };
 
-    const checkOnCallConflicts = (onCallName, boothsData) => {
+    const checkOnCallConflicts = (onCallName, boothsData, parsedLeaves = [], isSecondCall = false) => {
       if (!onCallName) return null;
       const onCallNames = onCallName.split(/[\s,、・]+|or/).map(n => getPureName(n)).filter(n => n.length > 0);
       if (onCallNames.length === 0) return null;
 
       const errorMessages = [];
+      const leaveNames = parsedLeaves.map(l => l.name);
 
       onCallNames.forEach(pureOnCallName => {
+        if (leaveNames.includes(pureOnCallName)) {
+          errorMessages.push(`${pureOnCallName}: 休暇者です`);
+        }
+
         const foundBooths = [];
         boothsData.forEach(booth => {
           const names = booth.staff.split(/[\s,、・]+|or/).map(n => getPureName(n));
@@ -548,10 +554,12 @@
           }
         });
 
-        if (foundBooths.length === 0) {
-          errorMessages.push(`${pureOnCallName}: 当日の担当一覧(ブース)に名前がありません`);
-        } else {
-          const invalidBooths = foundBooths.filter(role => !ALLOWED_ONCALL_ROLES.includes(role));
+        if (foundBooths.length > 0) {
+          const invalidBooths = foundBooths.filter(role => {
+            if (ALLOWED_ONCALL_ROLES.includes(role)) return false;
+            if (isSecondCall && role.includes('新患')) return false; // 2nd Callは新患と兼任OK
+            return true;
+          });
           if (invalidBooths.length > 0) {
             errorMessages.push(`${pureOnCallName}: 兼任不可の枠 (${invalidBooths.join(', ')}) にアサインされています`);
           }
@@ -614,6 +622,16 @@
       const [isSaving, setIsSaving] = useState(false);
       const [showLoginModal, setShowLoginModal] = useState(false);
       const [showHistoryModal, setShowHistoryModal] = useState(false);
+      const [showStatsModal, setShowStatsModal] = useState(false);
+      
+      // 一括入力・アラート一覧用のステート
+      const [showBatchOnCallModal, setShowBatchOnCallModal] = useState(false);
+      const [batchOnCalls, setBatchOnCalls] = useState({});
+      const [isBatchSaving, setIsBatchSaving] = useState(false);
+      const [showAlertsModal, setShowAlertsModal] = useState(false);
+      const [allAlerts, setAllAlerts] = useState([]);
+
+      const [statsTab, setStatsTab] = useState('new');
       const [password, setPassword] = useState('');
       const [loginError, setLoginError] = useState('');
 
@@ -919,6 +937,243 @@
         return len;
       };
 
+      const parseLeaveNames = (leaveStr) => {
+        const leaves = [];
+        if (!leaveStr) return leaves;
+        const entries = leaveStr.split(/[\s,、・]+|or/).filter(e => e.trim().length > 0);
+        
+        entries.forEach(entry => {
+          let name = getPureName(entry);
+          let leavePeriod = 'ALL'; 
+          
+          if (name.length === 0) return;
+
+          const originalWithBracketsMatch = entry.match(/[（\(](.*?)[）\)]/);
+          if (originalWithBracketsMatch) {
+            const reason = originalWithBracketsMatch[1].toUpperCase();
+            if (reason.includes('AM') || reason.includes('午前')) {
+              leavePeriod = 'AM';
+            } else if (reason.includes('PM') || reason.includes('午後')) {
+              leavePeriod = 'PM';
+            }
+          }
+          leaves.push({ name, leavePeriod });
+        });
+        return leaves;
+      };
+
+      // 共通アラート判定処理
+      const getAlertsForDate = (dateStr, daySchedules, isHol, onCallData) => {
+        if (isHol || !daySchedules) return [];
+        const alerts = [];
+
+        const leavesData = daySchedules[0] || { staff: '' };
+        const boothsData = daySchedules.slice(1);
+        const pLeaves = parseLeaveNames(leavesData.staff);
+        const curDOW = new Date(dateStr).getDay();
+
+        const oc1Error = checkOnCallConflicts(onCallData.first, boothsData, pLeaves, false);
+        if (oc1Error) alerts.push(`1st Call: ${oc1Error}`);
+        const oc2Error = checkOnCallConflicts(onCallData.second, boothsData, pLeaves, true);
+        if (oc2Error) alerts.push(`2nd Call: ${oc2Error}`);
+
+        const dbConf = checkConflicts(boothsData);
+
+        boothsData.forEach((item, localIndex) => {
+          const currentStaff = item.staff;
+          if (!currentStaff) return;
+          
+          const currentBoothNames = currentStaff.split(/[\s,、・]+|or/).map(n => getPureName(n)).filter(n => n.length > 0 && n !== 'なし' && !/^[✕☓×✗xX]+$/.test(n));
+          const currentBoothPeriod = getPeriod(item.role);
+
+          const conflictLeaves = pLeaves.filter(leave => {
+            if (!currentBoothNames.includes(leave.name)) return false;
+            return leave.leavePeriod === 'ALL' || leave.leavePeriod === currentBoothPeriod;
+          });
+          
+          if (conflictLeaves.length > 0) {
+            alerts.push(`[${item.role}] 休暇者重複(${conflictLeaves.map(l=>l.name).join(', ')})`);
+          }
+
+          if (item.role !== '豊里病院当直') {
+            const db = dbConf[localIndex];
+            if (db && db.length > 0) {
+              db.forEach(c => {
+                alerts.push(`[${item.role}] 重複: ${c.name} (他: ${c.others.join(', ')})`);
+              });
+            }
+          }
+
+          if (item.role === 'EGD②' && [2, 3, 4].includes(curDOW)) {
+            const invalidNames = currentBoothNames.filter(n => !VALID_EGD2_STAFF.includes(n));
+            if (invalidNames.length > 0) {
+              alerts.push(`[${item.role}] 検診登録医外(${invalidNames.join(', ')})`);
+            }
+          }
+        });
+
+        return [...new Set(alerts)];
+      };
+
+      const openBatchOnCallModal = () => {
+        const monthWeeks = weeksData.filter(w => w.months.includes(selectedMonth));
+        const monthDates = monthWeeks.flatMap(w => w.dates);
+        
+        const initialBatch = {};
+        monthDates.forEach(d => {
+          initialBatch[d] = { 
+            first: onCalls[d]?.first || '', 
+            second: onCalls[d]?.second || '' 
+          };
+        });
+        setBatchOnCalls(initialBatch);
+        setShowBatchOnCallModal(true);
+      };
+
+      const handleBatchOnCallChange = (dateStr, type, value) => {
+        setBatchOnCalls(prev => ({
+          ...prev,
+          [dateStr]: { ...prev[dateStr], [type]: value }
+        }));
+      };
+
+      const handleSaveBatchOnCalls = async () => {
+        if (!user) return;
+        setIsBatchSaving(true);
+        try {
+          const schedulesRef = collection(db, 'artifacts', APP_ID, 'public', 'data', COLLECTION_NAME);
+          const monthDates = Object.keys(batchOnCalls);
+          const promises = [];
+
+          for (const dateKey of monthDates) {
+            const oldOnCall = onCalls[dateKey] || { first: '', second: '' };
+            const newOnCall = batchOnCalls[dateKey];
+            
+            if (oldOnCall.first !== newOnCall.first || oldOnCall.second !== newOnCall.second) {
+              const docRef = doc(schedulesRef, dateKey);
+              const changes = [];
+              if (oldOnCall.first !== newOnCall.first) {
+                changes.push(`「1st Call」を一括入力で ${oldOnCall.first || '未設定'} から ${newOnCall.first || '未設定'} に変更`);
+              }
+              if (oldOnCall.second !== newOnCall.second) {
+                changes.push(`「2nd Call」を一括入力で ${oldOnCall.second || '未設定'} から ${newOnCall.second || '未設定'} に変更`);
+              }
+
+              promises.push(setDoc(docRef, {
+                onCallData: newOnCall,
+                lastChanges: changes,
+                updatedAt: new Date().toISOString(),
+                updatedBy: user.uid
+              }, { merge: true }));
+            }
+          }
+          
+          await Promise.all(promises);
+          setShowBatchOnCallModal(false);
+        } catch (error) {
+          console.error("Error saving batch oncalls: ", error);
+          alert("保存に失敗しました。");
+        } finally {
+          setIsBatchSaving(false);
+        }
+      };
+
+      const openAlertsModal = () => {
+        const todayDate = new Date(todayStr);
+        const allDates = weeksData.flatMap(w => w.dates).filter(d => new Date(d) >= todayDate);
+        
+        const alertsList = [];
+        allDates.forEach(d => {
+          const isHol = pendingHolidays[d] !== undefined ? pendingHolidays[d] : holidays[d];
+          const daySchedules = pendingChanges[d] || schedules[d] || defaultSchedules[d];
+          const onCallData = pendingOnCalls[d] !== undefined ? pendingOnCalls[d] : (onCalls[d] || {first:'', second:''});
+          
+          const dateAlerts = getAlertsForDate(d, daySchedules, isHol, onCallData);
+          if (dateAlerts.length > 0) {
+            alertsList.push({ date: d, alerts: dateAlerts });
+          }
+        });
+        
+        setAllAlerts(alertsList);
+        setShowAlertsModal(true);
+      };
+
+      // --- 新患・当番担当回数の集計ロジック ---
+      const getStats = () => {
+        const d = new Date(selectedDate);
+        // 現在の年/月を基準に、当月(m0)、前月(m1)、前々月(m2)の年月を算出
+        const targetMonths = [
+          { key: 'm2', date: new Date(d.getFullYear(), d.getMonth() - 2, 1) },
+          { key: 'm1', date: new Date(d.getFullYear(), d.getMonth() - 1, 1) },
+          { key: 'm0', date: new Date(d.getFullYear(), d.getMonth(), 1) },
+        ];
+        
+        const stats = {};
+        const normalizeName = (n) => n === '山田' ? '山田陽' : n;
+        
+        const allDates = Object.keys(defaultSchedules); // 期間内のすべての日付
+        allDates.forEach(dateStr => {
+          const dateObj = new Date(dateStr);
+          const year = dateObj.getFullYear();
+          const month = dateObj.getMonth();
+          
+          let targetKey = null;
+          for (const tm of targetMonths) {
+            if (tm.date.getFullYear() === year && tm.date.getMonth() === month) {
+              targetKey = tm.key;
+              break;
+            }
+          }
+          
+          if (!targetKey) return; // 3ヶ月分に該当しない日付はスキップ
+          
+          const isHol = pendingHolidays[dateStr] !== undefined ? pendingHolidays[dateStr] : holidays[dateStr];
+          if (isHol) return; // 休診日はカウントしない
+          
+          // 保存済み、またはデフォルトのスケジュールデータを使用
+          const dayData = schedules[dateStr] || defaultSchedules[dateStr];
+          const ocData = pendingOnCalls[dateStr] !== undefined ? pendingOnCalls[dateStr] : (onCalls[dateStr] || {first: '', second: ''});
+          if (!dayData) return;
+          
+          dayData.forEach(item => {
+            if (item.role.includes('新患')) {
+              const names = item.staff.split(/[\s,、・]+|or/).map(n => getPureName(n)).filter(n => n.length > 0 && n !== 'なし' && !/^[✕☓×✗xX]+$/.test(n));
+              names.forEach(rawName => {
+                const name = normalizeName(rawName);
+                if (!stats[name]) stats[name] = { name, m2_new: 0, m1_new: 0, m0_new: 0, m2_oncall: 0, m1_oncall: 0, m0_oncall: 0 };
+                stats[name][`${targetKey}_new`]++;
+              });
+            }
+          });
+
+          // 当番カウント
+          [ocData.first, ocData.second].forEach(ocStr => {
+             if (!ocStr) return;
+             const names = ocStr.split(/[\s,、・]+|or/).map(n => getPureName(n)).filter(n => n.length > 0 && n !== 'なし' && !/^[✕☓×✗xX]+$/.test(n));
+             names.forEach(rawName => {
+                const name = normalizeName(rawName);
+                if (!stats[name]) stats[name] = { name, m2_new: 0, m1_new: 0, m0_new: 0, m2_oncall: 0, m1_oncall: 0, m0_oncall: 0 };
+                stats[name][`${targetKey}_oncall`]++;
+             });
+          });
+        });
+        
+        const data = Object.values(stats).map(s => {
+           s.total_new = s.m2_new + s.m1_new + s.m0_new;
+           s.total_oncall = s.m2_oncall + s.m1_oncall + s.m0_oncall;
+           s.total_combined = s.total_new + s.total_oncall;
+           s.m2_combined = s.m2_new + s.m2_oncall;
+           s.m1_combined = s.m1_new + s.m1_oncall;
+           s.m0_combined = s.m0_new + s.m0_oncall;
+           return s;
+        });
+
+        return {
+          monthLabels: targetMonths.map(tm => `${tm.date.getMonth() + 1}月`),
+          data: data
+        };
+      };
+
       // --- PDFエクスポート処理（ブラウザ標準の印刷機能を利用） ---
       const handleExportPDF = async () => {
         if (viewMode !== 'week' && viewMode !== 'digest') {
@@ -1187,36 +1442,11 @@
       const currentWeekData = weeksData.find(w => w.id === selectedWeek);
       const leavesData = activeData[0] || { role: '休暇者', staff: '' };
       const boothsData = activeData.slice(1);
-
-      const parseLeaveNames = (leaveStr) => {
-        const leaves = [];
-      const entries = leaveStr.split(/[\s,、・]+|or/).filter(e => e.trim().length > 0);
-        
-      entries.forEach(entry => {
-        let name = getPureName(entry);
-        let leavePeriod = 'ALL'; 
-          
-          if (name.length === 0) return;
-
-          const originalWithBracketsMatch = entry.match(/[（\(](.*?)[）\)]/);
-          if (originalWithBracketsMatch) {
-            const reason = originalWithBracketsMatch[1].toUpperCase();
-            if (reason.includes('AM') || reason.includes('午前')) {
-              leavePeriod = 'AM';
-            } else if (reason.includes('PM') || reason.includes('午後')) {
-              leavePeriod = 'PM';
-            }
-          }
-          leaves.push({ name, leavePeriod });
-        });
-        return leaves;
-      };
-
       const parsedLeaves = parseLeaveNames(leavesData.staff);
       const doubleBookingConflicts = checkConflicts(boothsData);
 
-      const firstCallError = checkOnCallConflicts(activeOnCall.first, boothsData);
-      const secondCallError = checkOnCallConflicts(activeOnCall.second, boothsData);
+      const firstCallError = checkOnCallConflicts(activeOnCall.first, boothsData, parsedLeaves, false);
+      const secondCallError = checkOnCallConflicts(activeOnCall.second, boothsData, parsedLeaves, true);
 
       let latestUpdate = null;
       Object.values(schedulesMetadata).forEach(meta => {
@@ -1237,12 +1467,102 @@
       
       const currentDayOfWeek = new Date(selectedDate).getDay();
 
+      const hasDayAlert = !activeIsHoliday && (
+        firstCallError || secondCallError || boothsData.some((item, localIndex) => {
+          const currentStaff = item.staff;
+          if(!currentStaff) return false;
+          const currentBoothNames = currentStaff.split(/[\s,、・]+|or/).map(n => getPureName(n)).filter(n => n.length > 0);
+          const currentBoothPeriod = getPeriod(item.role);
+          const conflictLeaves = parsedLeaves.filter(leave => {
+            if (!currentBoothNames.includes(leave.name)) return false;
+            return leave.leavePeriod === 'ALL' || leave.leavePeriod === currentBoothPeriod;
+          });
+          if (item.role === '豊里病院当直') {
+            return conflictLeaves.length > 0;
+          }
+          if (conflictLeaves.length > 0) return true;
+          if (doubleBookingConflicts[localIndex] && doubleBookingConflicts[localIndex].length > 0) return true;
+          if (item.role === 'EGD②' && [2, 3, 4].includes(currentDayOfWeek)) {
+            const names = currentStaff.split(/[\s,、・]+|or/).map(n => getPureName(n)).filter(n => n.length > 0 && n !== 'なし' && !/^[✕☓×✗xX]+$/.test(n));
+            if (names.some(n => !VALID_EGD2_STAFF.includes(n))) return true;
+          }
+          return false;
+        })
+      );
+
       const renderWeekView = (isDigest = false) => {
         const weekDates = currentWeekData.dates;
         const weekSchedules = weekDates.map(d => pendingChanges[d] || schedules[d] || defaultSchedules[d]);
         const weekHolidays = weekDates.map(d => pendingHolidays[d] !== undefined ? pendingHolidays[d] : holidays[d]);
         const weekOnCalls = weekDates.map(d => pendingOnCalls[d] !== undefined ? pendingOnCalls[d] : (onCalls[d] || {first: '', second: ''}));
         const weekDefaultSchedules = weekDates.map(d => defaultSchedules[d]);
+        
+        // 週単位でエラー状態を事前計算
+        const weekAlerts = weekDates.map((d, i) => {
+          const dayData = weekSchedules[i];
+          if (!dayData || weekHolidays[i]) {
+            return { oc1Error: null, oc2Error: null, roleErrors: {} };
+          }
+          
+          const dayLeavesStr = dayData[0] ? dayData[0].staff : '';
+          const pLeaves = parseLeaveNames(dayLeavesStr);
+          const bData = dayData.slice(1);
+          
+          const dbConf = checkConflicts(bData);
+          
+          const onCall = weekOnCalls[i] || {first: '', second: ''};
+          const oc1E = checkOnCallConflicts(onCall.first, bData, pLeaves, false);
+          const oc2E = checkOnCallConflicts(onCall.second, bData, pLeaves, true);
+          
+          const curDOW = new Date(d).getDay();
+          const rErrors = {};
+
+          bData.forEach((item, localIndex) => {
+            let hasError = false;
+            let msgs = [];
+            const currentStaff = item.staff;
+            if (currentStaff && item.role !== '上部EUS' && item.role !== '豊里病院当直') {
+              const currentBoothNames = currentStaff.split(/[\s,、・]+|or/).map(n => getPureName(n)).filter(n => n.length > 0 && n !== 'なし' && !/^[✕☓×✗xX]+$/.test(n));
+              const currentBoothPeriod = getPeriod(item.role);
+
+              const conflictLeaves = pLeaves.filter(leave => {
+                if (!currentBoothNames.includes(leave.name)) return false;
+                return leave.leavePeriod === 'ALL' || leave.leavePeriod === currentBoothPeriod;
+              });
+              if (conflictLeaves.length > 0) {
+                hasError = true;
+                msgs.push('休暇者重複');
+              }
+
+              const db = dbConf[localIndex];
+              if (db && db.length > 0) {
+                hasError = true;
+                msgs.push('重複');
+              }
+
+              if (item.role === 'EGD②' && [2, 3, 4].includes(curDOW)) {
+                const invalidNames = currentBoothNames.filter(n => !VALID_EGD2_STAFF.includes(n));
+                if (invalidNames.length > 0) {
+                  hasError = true;
+                  msgs.push('検診登録医外');
+                }
+              }
+            } else if (currentStaff && item.role === '豊里病院当直') {
+              // 豊里病院当直は休暇重複のみチェック
+              const currentBoothNames = currentStaff.split(/[\s,、・]+|or/).map(n => getPureName(n)).filter(n => n.length > 0 && n !== 'なし');
+              const conflictLeaves = pLeaves.filter(leave => currentBoothNames.includes(leave.name));
+              if (conflictLeaves.length > 0) {
+                hasError = true;
+                msgs.push('休暇者重複');
+              }
+            }
+            if (hasError) {
+              rErrors[item.role] = msgs;
+            }
+          });
+
+          return { oc1Error: oc1E, oc2Error: oc2E, roleErrors: rErrors };
+        });
 
         const formatStaffNameForWeekView = (staffStr, firstCall, secondCall) => {
           if (!staffStr) return null;
@@ -1347,6 +1667,9 @@
                   changedRolesSet.add(item.role);
                 }
               });
+              // アラートがある枠もダイジェストに表示する
+              const dayAlert = weekAlerts[dayIdx];
+              Object.keys(dayAlert.roleErrors).forEach(role => changedRolesSet.add(role));
             }
             const oc = weekOnCalls[dayIdx];
             if (!weekHolidays[dayIdx]) {
@@ -1399,6 +1722,8 @@
                       </td>
                       {weekDates.map((d, i) => {
                         const hasOnCall = !!weekOnCalls[i]?.first;
+                        const hasOc1Error = !!weekAlerts[i].oc1Error;
+                        
                         if (weekHolidays[i]) {
                           return <td key={d} className="p-2 text-center border-r border-slate-200"><span className="text-rose-300">-</span></td>;
                         }
@@ -1406,7 +1731,12 @@
                           return <td key={d} className="p-2 text-center border-r border-slate-200 bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(0,0,0,0.02)_4px,rgba(0,0,0,0.02)_8px)]"></td>;
                         }
                         return (
-                          <td key={d} className="p-2 text-center border-r border-slate-200 last:border-r-0 font-bold text-pink-900">
+                          <td key={d} className={`p-2 text-center border-r border-slate-200 last:border-r-0 font-bold ${hasOc1Error ? 'bg-red-50 text-red-700 border-red-200' : 'text-pink-900'}`}>
+                            {hasOc1Error && (
+                              <span title="兼任不可" className="inline-block mr-1 align-middle">
+                                <IconAlertTriangle className="w-3.5 h-3.5 text-red-600" />
+                              </span>
+                            )}
                             {hasOnCall ? formatStaffNameForWeekView(weekOnCalls[i].first, null, null) : <span className="text-slate-300">-</span>}
                           </td>
                         );
@@ -1422,6 +1752,8 @@
                       </td>
                       {weekDates.map((d, i) => {
                         const hasOnCall = !!weekOnCalls[i]?.second;
+                        const hasOc2Error = !!weekAlerts[i].oc2Error;
+                        
                         if (weekHolidays[i]) {
                           return <td key={d} className="p-2 text-center border-r border-slate-200"><span className="text-rose-300">-</span></td>;
                         }
@@ -1429,7 +1761,12 @@
                           return <td key={d} className="p-2 text-center border-r border-slate-200 bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(0,0,0,0.02)_4px,rgba(0,0,0,0.02)_8px)]"></td>;
                         }
                         return (
-                          <td key={d} className="p-2 text-center border-r border-slate-200 last:border-r-0 font-bold text-sky-900">
+                          <td key={d} className={`p-2 text-center border-r border-slate-200 last:border-r-0 font-bold ${hasOc2Error ? 'bg-red-50 text-red-700 border-red-200' : 'text-sky-900'}`}>
+                            {hasOc2Error && (
+                              <span title="兼任不可" className="inline-block mr-1 align-middle">
+                                <IconAlertTriangle className="w-3.5 h-3.5 text-red-600" />
+                              </span>
+                            )}
                             {hasOnCall ? formatStaffNameForWeekView(weekOnCalls[i].second, null, null) : <span className="text-slate-300">-</span>}
                           </td>
                         );
@@ -1467,9 +1804,12 @@
                           const defaultStaff = defaultItem ? defaultItem.staff : '';
                           const isChanged = staff !== defaultStaff;
                           const isNewBooth = !defaultItem && item;
+                          
+                          const errorMsgs = weekAlerts[i].roleErrors[role];
+                          const hasError = !!errorMsgs;
 
-                          // 週別ダイジェストで変更がない日は斜線背景にして中身を空にする
-                          if (isDigest && !isChanged && !isNewBooth) {
+                          // 週別ダイジェストで変更がない（かつエラーもない）日は斜線背景にして中身を空にする
+                          if (isDigest && !isChanged && !isNewBooth && !hasError) {
                             return (
                               <td key={d} className="p-2 text-center border-r border-slate-200 bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(0,0,0,0.02)_4px,rgba(0,0,0,0.02)_8px)]">
                               </td>
@@ -1477,7 +1817,9 @@
                           }
                           
                           let cellClass = 'p-2 text-center border-r border-slate-200 font-medium text-sm align-middle leading-snug ';
-                          if (isNewBooth) {
+                          if (hasError) {
+                            cellClass += 'bg-red-50 border-red-200 text-red-700 font-bold';
+                          } else if (isNewBooth) {
                             cellClass += (isToday && !isEditMode) ? 'bg-fuchsia-100 text-fuchsia-900 font-bold animate-flash-bg-fuchsia' : 'bg-fuchsia-50/80 text-fuchsia-800 font-bold';
                           } else if (isChanged) {
                             cellClass += (isToday && !isEditMode) ? 'bg-amber-100/60 animate-flash-bg' : 'bg-amber-50/80';
@@ -1489,7 +1831,7 @@
 
                           return (
                             <td key={d} className={cellClass}>
-                              {isChanged && !isNewBooth && defaultStaff ? (
+                              {isChanged && !isNewBooth && defaultStaff && !hasError ? (
                                 <div className="flex flex-col items-center justify-center">
                                   <div className="text-[10px] text-slate-500 line-through mb-0.5 whitespace-nowrap">
                                     {defaultStaff}
@@ -1499,7 +1841,12 @@
                                   </div>
                                 </div>
                               ) : (
-                                <div className={isChanged && !isNewBooth ? `font-bold ${(isToday && !isEditMode) ? 'text-red-600 animate-flash-text' : 'text-red-700'}` : (isNewBooth && isToday && !isEditMode ? 'animate-flash-text' : '')}>
+                                <div className={isChanged && !isNewBooth && !hasError ? `font-bold ${(isToday && !isEditMode) ? 'text-red-600 animate-flash-text' : 'text-red-700'}` : (isNewBooth && isToday && !isEditMode && !hasError ? 'animate-flash-text' : '')}>
+                                  {hasError && (
+                                    <span title={errorMsgs.join(', ')} className="inline-block mr-1 align-middle">
+                                      <IconAlertTriangle className="w-3.5 h-3.5 text-red-600" />
+                                    </span>
+                                  )}
                                   {staff ? formatStaffNameForWeekView(staff, weekOnCalls[i]?.first, weekOnCalls[i]?.second) : <span className="text-slate-300">-</span>}
                                 </div>
                               )}
@@ -1679,24 +2026,45 @@
 
             {isAdmin && !isEditMode && (
               <div className="bg-blue-50/50 rounded-lg border border-blue-200 p-3 mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 print:hidden">
-                <div className="flex items-center gap-1.5 text-blue-800">
+                <div className="flex items-center gap-1.5 text-blue-800 shrink-0">
                   <IconShieldAlert className="w-4 h-4" />
                   <span className="font-bold text-xs">管理者モード</span>
                 </div>
-                <div className="flex gap-2 w-full sm:w-auto">
+                <div className="flex gap-2 w-full sm:w-auto flex-wrap justify-end">
+                  <button 
+                    onClick={openAlertsModal}
+                    className="flex items-center justify-center gap-1.5 bg-white border border-red-300 text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm w-full sm:w-auto"
+                  >
+                    <IconAlertCircle className="w-3.5 h-3.5" />
+                    アラート一覧
+                  </button>
+                  <button 
+                    onClick={openBatchOnCallModal}
+                    className="flex items-center justify-center gap-1.5 bg-white border border-indigo-300 text-indigo-700 hover:bg-indigo-50 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm w-full sm:w-auto"
+                  >
+                    <IconClock className="w-3.5 h-3.5" />
+                    当番一括入力
+                  </button>
+                  <button 
+                    onClick={() => setShowStatsModal(true)}
+                    className="flex items-center justify-center gap-1.5 bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm w-full sm:w-auto"
+                  >
+                    <IconBarChart className="w-3.5 h-3.5" />
+                    当番・新患集計
+                  </button>
                   <button 
                     onClick={() => setShowHistoryModal(true)}
-                    className="flex items-center justify-center gap-1.5 bg-white border border-blue-300 text-blue-700 hover:bg-blue-50 px-4 py-2 rounded-md text-sm font-bold transition-colors shadow-sm"
+                    className="flex items-center justify-center gap-1.5 bg-white border border-blue-300 text-blue-700 hover:bg-blue-50 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm w-full sm:w-auto"
                   >
                     <IconClock className="w-3.5 h-3.5" />
                     更新履歴
                   </button>
                   <button 
                     onClick={handleEditStart}
-                    className="flex items-center justify-center gap-1.5 bg-white border border-blue-600 text-blue-700 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-md text-sm font-bold transition-colors w-full sm:w-auto shadow-sm"
+                    className="flex items-center justify-center gap-1.5 bg-white border border-blue-600 text-blue-700 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded-md text-sm font-bold transition-colors w-full sm:w-auto shadow-sm"
                   >
                     <IconEdit className="w-3.5 h-3.5" />
-                    出番・枠を変更する（日別）
+                    出番・枠を変更（日別）
                   </button>
                 </div>
               </div>
@@ -1720,6 +2088,12 @@
                     <h2 className="text-base font-black text-slate-700 flex items-center gap-1.5">
                       {parseInt(selectedDate.split('-')[1])}/{parseInt(selectedDate.split('-')[2])} 
                       {getDayName(selectedDate)}
+                      {hasDayAlert && (
+                        <span className="ml-2 text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded border border-red-300 flex items-center gap-1 shadow-sm">
+                          <IconAlertTriangle className="w-3 h-3" />
+                          アラートあり
+                        </span>
+                      )}
                     </h2>
                     <div className="flex items-center gap-3">
                       {isEditMode && (
@@ -1810,7 +2184,7 @@
                                 className="flex-1 p-1.5 border-2 border-slate-200 rounded outline-none focus:border-pink-400 transition-colors text-sm font-bold"
                               />
                             </div>
-                            {firstCallError && <p className="text-[10px] text-red-600 mt-1 ml-[72px] font-bold">{firstCallError}</p>}
+                            {firstCallError && <p className="text-[10px] text-red-600 mt-1 ml-[72px] font-bold flex items-center gap-1"><IconAlertTriangle className="w-3 h-3" />{firstCallError}</p>}
                           </div>
                           
                           <div>
@@ -1824,18 +2198,34 @@
                                 className="flex-1 p-1.5 border-2 border-slate-200 rounded outline-none focus:border-sky-400 transition-colors text-sm font-bold"
                               />
                             </div>
-                            {secondCallError && <p className="text-[10px] text-red-600 mt-1 ml-[72px] font-bold">{secondCallError}</p>}
+                            {secondCallError && <p className="text-[10px] text-red-600 mt-1 ml-[72px] font-bold flex items-center gap-1"><IconAlertTriangle className="w-3 h-3" />{secondCallError}</p>}
                           </div>
                         </div>
                       ) : (
-                        <div className="text-sm font-bold text-slate-800 flex flex-wrap gap-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-pink-700 border border-pink-300 bg-pink-100 px-1.5 py-0.5 rounded shadow-sm">1st Call</span>
-                            <span className="text-base">{activeOnCall.first || <span className="text-slate-400 text-sm font-normal">（未設定）</span>}</span>
+                        <div className="text-sm font-bold text-slate-800 flex flex-col gap-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[10px] text-pink-700 border border-pink-300 bg-pink-100 px-1.5 py-0.5 rounded shadow-sm w-14 text-center">1st Call</span>
+                            <span className={`text-base flex items-center gap-1 ${firstCallError ? 'text-red-700' : ''}`}>
+                              {firstCallError && <IconAlertTriangle className="w-4 h-4 text-red-600" />}
+                              {activeOnCall.first || <span className="text-slate-400 text-sm font-normal">（未設定）</span>}
+                            </span>
+                            {firstCallError && (
+                              <span className="text-red-600 text-[10px] font-bold flex items-center gap-1 bg-red-50 px-1.5 py-0.5 rounded border border-red-200 ml-1">
+                                {firstCallError}
+                              </span>
+                            )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-sky-700 border border-sky-300 bg-sky-100 px-1.5 py-0.5 rounded shadow-sm">2nd Call</span>
-                            <span className="text-base">{activeOnCall.second || <span className="text-slate-400 text-sm font-normal">（未設定）</span>}</span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[10px] text-sky-700 border border-sky-300 bg-sky-100 px-1.5 py-0.5 rounded shadow-sm w-14 text-center">2nd Call</span>
+                            <span className={`text-base flex items-center gap-1 ${secondCallError ? 'text-red-700' : ''}`}>
+                              {secondCallError && <IconAlertTriangle className="w-4 h-4 text-red-600" />}
+                              {activeOnCall.second || <span className="text-slate-400 text-sm font-normal">（未設定）</span>}
+                            </span>
+                            {secondCallError && (
+                              <span className="text-red-600 text-[10px] font-bold flex items-center gap-1 bg-red-50 px-1.5 py-0.5 rounded border border-red-200 ml-1">
+                                {secondCallError}
+                              </span>
+                            )}
                           </div>
                         </div>
                       )}
@@ -1877,7 +2267,13 @@
                           }
                         }
 
-                        const isError = hasLeaveConflict || hasDoubleBooking || egd2Error;
+                        // 豊里病院当直のアラート例外処理
+                        let isError = false;
+                        if (item.role === '豊里病院当直') {
+                          isError = hasLeaveConflict; // 休暇重複のみエラーとする
+                        } else {
+                          isError = hasLeaveConflict || hasDoubleBooking || egd2Error;
+                        }
                         
                         const rowClass = `relative flex flex-col sm:flex-row items-stretch transition-colors border-b border-slate-200 last:border-b-0 ${
                           isError ? 'bg-red-50' : isNewBooth ? (isToday && !isEditMode ? 'animate-flash-bg-fuchsia' : 'bg-fuchsia-50/60') : changed && !isEditMode ? (isToday ? 'animate-flash-bg border-amber-300' : 'bg-amber-50/40') : 'hover:bg-slate-50'
@@ -1944,7 +2340,7 @@
                                         <IconAlertTriangle className="w-3 h-3" /> 休暇者 ({conflictNames.join(', ')}) が含まれています
                                       </div>
                                     )}
-                                    {hasDoubleBooking && doubleBookings.map((db, i) => (
+                                    {hasDoubleBooking && item.role !== '豊里病院当直' && doubleBookings.map((db, i) => (
                                       <div key={i} className="text-red-600 text-[10px] font-bold mt-1 flex items-center gap-1">
                                         <IconAlertTriangle className="w-3 h-3" /> 重複: {db.name} (他: {db.others.join(', ')})
                                       </div>
@@ -1966,14 +2362,16 @@
                                               <IconArrowRight className="w-2.5 h-2.5" />
                                             </div>
                                           )}
-                                          <span className={`text-base sm:text-lg font-black drop-shadow-sm ${
+                                          <span className={`flex items-center gap-1.5 text-base sm:text-lg font-black drop-shadow-sm ${
                                             isError ? 'text-red-700' : isNewBooth ? (isToday ? 'text-fuchsia-700 animate-flash-text' : 'text-fuchsia-700') : (isToday ? 'text-red-600 animate-flash-text' : 'text-red-600')
                                           }`}>
+                                            {isError && <IconAlertTriangle className="w-4 h-4 text-red-600" />}
                                             {currentStaff ? renderStaffWithHighlight(currentStaff, activeOnCall.first, activeOnCall.second) : <span className="text-slate-300 text-sm font-normal">（未設定）</span>}
                                           </span>
                                         </>
                                       ) : (
-                                        <span className={`text-base sm:text-lg font-black drop-shadow-sm ${isError ? 'text-red-700' : 'text-slate-800'}`}>
+                                        <span className={`flex items-center gap-1.5 text-base sm:text-lg font-black drop-shadow-sm ${isError ? 'text-red-700' : 'text-slate-800'}`}>
+                                          {isError && <IconAlertTriangle className="w-4 h-4 text-red-600" />}
                                           {currentStaff ? renderStaffWithHighlight(currentStaff, activeOnCall.first, activeOnCall.second) : null}
                                         </span>
                                       )}
@@ -1983,7 +2381,7 @@
                                           <IconAlertTriangle className="w-3 h-3" /> 休暇者 ({conflictNames.join(', ')}) が含まれています
                                         </div>
                                       )}
-                                      {hasDoubleBooking && doubleBookings.map((db, i) => (
+                                      {hasDoubleBooking && item.role !== '豊里病院当直' && doubleBookings.map((db, i) => (
                                         <div className="text-red-600 text-[10px] font-bold mt-0.5 flex items-center gap-1">
                                           <IconAlertTriangle className="w-3 h-3" /> 重複: {db.name} (他: {db.others.join(', ')})
                                         </div>
@@ -2091,6 +2489,102 @@
               </div>
             )}
           </main>
+
+          {/* 新患・当番担当集計モーダル */}
+          {showStatsModal && (
+            <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm print:hidden">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-emerald-50">
+                  <h3 className="font-bold text-base flex items-center gap-1.5 text-emerald-800">
+                    <IconBarChart className="w-5 h-5" />
+                    担当回数集計
+                  </h3>
+                  <button 
+                    onClick={() => setShowStatsModal(false)}
+                    className="p-1 hover:bg-emerald-200 rounded text-emerald-600 transition-colors"
+                  >
+                    <IconX className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                {/* タブ切り替え */}
+                <div className="flex border-b border-slate-200 bg-white">
+                  <button 
+                    onClick={() => setStatsTab('new')}
+                    className={`flex-1 py-3 text-sm font-bold border-b-2 transition-colors ${statsTab === 'new' ? 'border-emerald-500 text-emerald-700 bg-emerald-50/30' : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
+                  >
+                    新患のみ
+                  </button>
+                  <button 
+                    onClick={() => setStatsTab('combined')}
+                    className={`flex-1 py-3 text-sm font-bold border-b-2 transition-colors ${statsTab === 'combined' ? 'border-blue-500 text-blue-700 bg-blue-50/30' : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
+                  >
+                    日中当番 ＋ 新患
+                  </button>
+                </div>
+                
+                <div className="p-4 overflow-y-auto bg-slate-50 flex-1">
+                  {(() => {
+                    const stats = getStats();
+                    const isCombined = statsTab === 'combined';
+                    
+                    const sortedData = [...stats.data].sort((a, b) => {
+                      const totalA = isCombined ? a.total_combined : a.total_new;
+                      const totalB = isCombined ? b.total_combined : b.total_new;
+                      return totalB - totalA || a.name.localeCompare(b.name);
+                    });
+
+                    if (sortedData.length === 0) {
+                      return <p className="text-center text-slate-500 py-8 text-sm">集計データがありません</p>;
+                    }
+                    
+                    return (
+                      <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                        <table className="w-full text-sm text-left">
+                          <thead className={`border-b border-slate-200 ${isCombined ? 'bg-blue-50 text-blue-800' : 'bg-slate-100 text-slate-600'}`}>
+                            <tr>
+                              <th className="p-3 font-bold">担当医</th>
+                              <th className="p-3 font-bold text-center w-20">{stats.monthLabels[0]}</th>
+                              <th className="p-3 font-bold text-center w-20">{stats.monthLabels[1]}</th>
+                              <th className="p-3 font-bold text-center w-20">{stats.monthLabels[2]}</th>
+                              <th className={`p-3 font-bold text-center w-20 ${isCombined ? 'text-blue-700 bg-blue-100/50' : 'text-emerald-700 bg-emerald-50/50'}`}>合計</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {sortedData.map(item => {
+                              const total = isCombined ? item.total_combined : item.total_new;
+                              if (total === 0) return null;
+                              return (
+                                <tr key={item.name} className="hover:bg-slate-50 transition-colors">
+                                  <td className="p-3 font-bold text-slate-800">{item.name}</td>
+                                  <td className="p-3 text-center text-slate-600">{isCombined ? item.m2_combined : item.m2_new || '-'}</td>
+                                  <td className="p-3 text-center text-slate-600">{isCombined ? item.m1_combined : item.m1_new || '-'}</td>
+                                  <td className="p-3 text-center text-slate-600">{isCombined ? item.m0_combined : item.m0_new || '-'}</td>
+                                  <td className={`p-3 text-center font-bold ${isCombined ? 'text-blue-600 bg-blue-50/30' : 'text-emerald-600 bg-emerald-50/30'}`}>{total}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })()}
+                  <p className="text-xs text-slate-500 mt-3 flex items-center gap-1">
+                    <IconAlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    ※選択中の月とその過去2ヶ月分（システムに登録されている期間のみ）を集計しています。山田先生と山田陽先生は同一人物（山田陽）として合算しています。
+                  </p>
+                </div>
+                <div className="p-4 border-t border-slate-200 bg-white flex justify-end">
+                  <button 
+                    onClick={() => setShowStatsModal(false)}
+                    className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold text-sm transition-colors border border-slate-300"
+                  >
+                    閉じる
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {showLoginModal && (
             <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm print:hidden">
@@ -2211,6 +2705,184 @@
                 <div className="p-4 border-t border-slate-200 bg-white flex justify-end">
                   <button 
                     onClick={() => setShowHistoryModal(false)}
+                    className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold text-sm transition-colors border border-slate-300"
+                  >
+                    閉じる
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 当番一括入力モーダル */}
+          {showBatchOnCallModal && (
+            <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm print:hidden">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-indigo-50">
+                  <h3 className="font-bold text-base flex items-center gap-1.5 text-indigo-800">
+                    <IconClock className="w-5 h-5" />
+                    {selectedMonth}月の当番一括入力
+                  </h3>
+                  <button 
+                    onClick={() => setShowBatchOnCallModal(false)}
+                    disabled={isBatchSaving}
+                    className="p-1 hover:bg-indigo-200 rounded text-indigo-600 transition-colors disabled:opacity-50"
+                  >
+                    <IconX className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <div className="p-4 overflow-y-auto bg-slate-50 flex-1">
+                  <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-slate-100 border-b border-slate-200 text-slate-600">
+                        <tr>
+                          <th className="p-2 font-bold w-32">日付</th>
+                          <th className="p-2 font-bold w-1/3">1st Call</th>
+                          <th className="p-2 font-bold w-1/3">2nd Call</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {Object.keys(batchOnCalls).map(d => {
+                          const isHol = pendingHolidays[d] !== undefined ? pendingHolidays[d] : holidays[d];
+                          const daySchedules = schedules[d] || defaultSchedules[d];
+                          const leavesData = daySchedules[0] || { staff: '' };
+                          const pLeaves = parseLeaveNames(leavesData.staff);
+                          const boothsData = daySchedules.slice(1);
+                          
+                          const oc1Err = checkOnCallConflicts(batchOnCalls[d].first, boothsData, pLeaves, false);
+                          const oc2Err = checkOnCallConflicts(batchOnCalls[d].second, boothsData, pLeaves, true);
+
+                          return (
+                            <tr key={d} className={isHol ? 'bg-rose-50/50' : 'hover:bg-slate-50 transition-colors'}>
+                              <td className="p-2 border-r border-slate-100 font-bold text-slate-700 align-top pt-3">
+                                {d.split('-')[1]}/{d.split('-')[2]} {getDayName(d)}
+                                {isHol && <span className="ml-1 text-[10px] text-rose-500 font-normal">休</span>}
+                              </td>
+                              <td className="p-2 border-r border-slate-100 align-top">
+                                <input 
+                                  type="text" 
+                                  value={batchOnCalls[d].first}
+                                  onChange={(e) => handleBatchOnCallChange(d, 'first', e.target.value)}
+                                  disabled={isHol || isBatchSaving}
+                                  placeholder="未設定"
+                                  className={`w-full p-2 border-2 rounded outline-none transition-colors text-sm font-medium disabled:opacity-50 ${oc1Err ? 'border-red-300 bg-red-50 focus:border-red-400' : 'border-slate-200 focus:border-indigo-400'}`}
+                                />
+                                {oc1Err && (
+                                  <div className="text-[10px] text-red-600 font-bold mt-1 flex items-start gap-1">
+                                    <IconAlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+                                    <span>{oc1Err}</span>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-2 align-top">
+                                <input 
+                                  type="text" 
+                                  value={batchOnCalls[d].second}
+                                  onChange={(e) => handleBatchOnCallChange(d, 'second', e.target.value)}
+                                  disabled={isHol || isBatchSaving}
+                                  placeholder="未設定"
+                                  className={`w-full p-2 border-2 rounded outline-none transition-colors text-sm font-medium disabled:opacity-50 ${oc2Err ? 'border-red-300 bg-red-50 focus:border-red-400' : 'border-slate-200 focus:border-indigo-400'}`}
+                                />
+                                {oc2Err && (
+                                  <div className="text-[10px] text-red-600 font-bold mt-1 flex items-start gap-1">
+                                    <IconAlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+                                    <span>{oc2Err}</span>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div className="p-4 border-t border-slate-200 bg-white flex justify-end gap-3">
+                  <button 
+                    onClick={() => setShowBatchOnCallModal(false)}
+                    disabled={isBatchSaving}
+                    className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold text-sm transition-colors border border-slate-300 disabled:opacity-50"
+                  >
+                    キャンセル
+                  </button>
+                  <button 
+                    onClick={handleSaveBatchOnCalls}
+                    disabled={isBatchSaving}
+                    className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-bold text-sm transition-colors shadow-sm disabled:opacity-50"
+                  >
+                    {isBatchSaving ? <IconLoader2 className="w-4 h-4" /> : <IconSave className="w-4 h-4" />}
+                    {isBatchSaving ? '保存中...' : '一括保存'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 未処理のアラート一覧モーダル */}
+          {showAlertsModal && (
+            <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm print:hidden">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-red-50">
+                  <h3 className="font-bold text-base flex items-center gap-1.5 text-red-800">
+                    <IconAlertCircle className="w-5 h-5" />
+                    未処理のアラート一覧（本日以降）
+                  </h3>
+                  <button 
+                    onClick={() => setShowAlertsModal(false)}
+                    className="p-1 hover:bg-red-200 rounded text-red-600 transition-colors"
+                  >
+                    <IconX className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <div className="p-4 overflow-y-auto bg-slate-50 flex-1">
+                  {allAlerts.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-emerald-600">
+                      <IconSparkles className="w-12 h-12 mb-3 opacity-50" />
+                      <p className="font-bold text-lg">未処理のアラートはありません 🎉</p>
+                      <p className="text-sm mt-1 opacity-80">全てのスケジュールが正常に登録されています。</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {allAlerts.map(item => (
+                        <div key={item.date} className="bg-white rounded-lg border border-red-200 p-3 shadow-sm">
+                          <div className="flex justify-between items-center border-b border-red-100 pb-2 mb-2">
+                            <div className="font-bold text-red-800 flex items-center gap-1.5">
+                              <IconCalendar className="w-4 h-4" />
+                              {item.date.split('-')[1]}/{item.date.split('-')[2]} {getDayName(item.date)}
+                            </div>
+                            <button 
+                              onClick={() => {
+                                setShowAlertsModal(false);
+                                const month = parseInt(item.date.split('-')[1], 10);
+                                const week = weeksData.find(w => w.dates.includes(item.date));
+                                setSelectedMonth(month);
+                                setSelectedWeek(week.id);
+                                setSelectedDate(item.date);
+                                setViewMode('day');
+                              }}
+                              className="text-xs bg-red-50 text-red-700 hover:bg-red-100 px-3 py-1.5 rounded font-bold transition-colors border border-red-200 flex items-center gap-1"
+                            >
+                              <IconEdit className="w-3.5 h-3.5" /> この日を編集
+                            </button>
+                          </div>
+                          <ul className="text-sm text-red-700 space-y-1.5">
+                            {item.alerts.map((alert, i) => (
+                              <li key={i} className="flex items-start gap-1.5">
+                                <IconAlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                                <span className="leading-tight">{alert}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="p-4 border-t border-slate-200 bg-white flex justify-end">
+                  <button 
+                    onClick={() => setShowAlertsModal(false)}
                     className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold text-sm transition-colors border border-slate-300"
                   >
                     閉じる
