@@ -436,6 +436,9 @@
       if (role === '休暇者') return 'bg-rose-100 text-rose-800 border-rose-300';
       if (isNewBooth) return 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-400 shadow-[0_0_10px_rgba(217,70,239,0.3)] ring-1 ring-fuchsia-300';
       
+      const pmBooths = ['若林CS', '循環器病センターEGD', 'ゆうファミリー'];
+      if (pmBooths.includes(role)) return 'bg-yellow-50 text-yellow-800 border-yellow-300';
+
       const externals = ['若林', '女川', '涌谷', '一番町', '健診', '刈田', '真壁', '矢本', '渡辺', '佐藤', 'ゆう', '高砂', '循環器', '葵会', '米谷', '南相馬', '豊里'];
       if (externals.some(kw => role.includes(kw))) return 'bg-stone-100 text-stone-700 border-stone-300'; 
       if (role === '再診(片山)') return 'bg-teal-50 text-teal-800 border-teal-200';
@@ -457,8 +460,11 @@
       } else if (isNewBooth) {
         bgColor = 'FFFAEAFF'; // fuchsia-100
       } else {
+        const pmBooths = ['若林CS', '循環器病センターEGD', 'ゆうファミリー'];
         const externals = ['若林', '女川', '涌谷', '一番町', '健診', '刈田', '真壁', '矢本', '渡辺', '佐藤', 'ゆう', '高砂', '循環器', '葵会', '米谷', '南相馬', '豊里'];
-        if (externals.some(kw => role.includes(kw))) {
+        if (pmBooths.includes(role)) {
+          bgColor = 'FFFEFCE8'; // yellow-50
+        } else if (externals.some(kw => role.includes(kw))) {
           bgColor = 'FFF5F5F4'; // stone-100
         } else if (role === '再診(片山)') {
           bgColor = 'FFF0FDFA'; // teal-50
@@ -487,7 +493,7 @@
     const checkConflicts = (booths) => {
       const staffMap = {}; 
       booths.forEach((booth, localIndex) => {
-        if (!booth.staff || booth.role === '上部EUS') return; 
+        if (!booth.staff || booth.role === '上部EUS' || booth.role === '豊里病院当直') return; 
         const names = booth.staff.split(/[\s,、・]+|or/).map(n => getPureName(n)).filter(n => {
           if (n.length === 0) return false;
           if (n === 'なし') return false;
@@ -1184,11 +1190,11 @@
 
       const parseLeaveNames = (leaveStr) => {
         const leaves = [];
-        const entries = leaveStr.split(/[\s,、・]+|or/).filter(e => e.trim().length > 0);
+      const entries = leaveStr.split(/[\s,、・]+|or/).filter(e => e.trim().length > 0);
         
-        entries.forEach(entry => {
-          let name = getPureName(entry);
-          let leavePeriod = 'ALL'; 
+      entries.forEach(entry => {
+        let name = getPureName(entry);
+        let leavePeriod = 'ALL'; 
           
           if (name.length === 0) return;
 
