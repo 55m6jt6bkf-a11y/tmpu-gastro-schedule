@@ -132,6 +132,7 @@
     const IconMegaphone = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>;
     const IconFileText = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>;
     const IconBarChart = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/></svg>;
+    const IconUpload = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>;
 
     // 名前の純粋化: カッコ内に「潤」を含むものは残し、(AM)(午後)などは除去する
     const getPureName = (str) => {
@@ -1075,6 +1076,97 @@
           alert("保存に失敗しました。");
         } finally {
           setIsBatchSaving(false);
+        }
+      };
+
+      const handleFileUpload = async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        setIsBatchSaving(true);
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const workbook = new ExcelJS.Workbook();
+          await workbook.xlsx.load(arrayBuffer);
+          const worksheet = workbook.worksheets[0]; 
+
+          const newBatchData = { ...batchOnCalls };
+          const year = new Date(selectedDate).getFullYear(); 
+          const month = selectedMonth;
+
+          worksheet.eachRow((row, rowNumber) => {
+            row.eachCell((cell, colNumber) => {
+              const cellValue = cell.value;
+              let dayValue = null;
+
+              // 日付セル（1〜31の数字）であるか判定
+              if (typeof cellValue === 'number' && Number.isInteger(cellValue) && cellValue >= 1 && cellValue <= 31) {
+                dayValue = cellValue;
+              } else if (typeof cellValue === 'string') {
+                const parsed = parseInt(cellValue, 10);
+                if (!isNaN(parsed) && parsed.toString() === cellValue.trim() && parsed >= 1 && parsed <= 31) {
+                   dayValue = parsed;
+                }
+              } else if (cellValue && typeof cellValue === 'object' && cellValue.richText) {
+                const text = cellValue.richText.map(t => t.text).join('').trim();
+                const parsed = parseInt(text, 10);
+                if (!isNaN(parsed) && parsed.toString() === text && parsed >= 1 && parsed <= 31) {
+                    dayValue = parsed;
+                }
+              }
+
+              if (dayValue !== null) {
+                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(dayValue).padStart(2, '0')}`;
+                
+                if (newBatchData[dateStr]) { 
+                  // 1st Call (日付の1つ下の行)
+                  const firstCell = worksheet.getCell(rowNumber + 1, colNumber);
+                  let firstStr = '';
+                  if (firstCell && firstCell.value) {
+                     firstStr = typeof firstCell.value === 'object' && firstCell.value.richText 
+                         ? firstCell.value.richText.map(t => t.text).join('') 
+                         : firstCell.value.toString();
+                  }
+                  
+                  // 2nd Call (日付の2つ下の行)
+                  const secondCell = worksheet.getCell(rowNumber + 2, colNumber);
+                  let secondStr = '';
+                  if (secondCell && secondCell.value) {
+                     secondStr = typeof secondCell.value === 'object' && secondCell.value.richText 
+                         ? secondCell.value.richText.map(t => t.text).join('') 
+                         : secondCell.value.toString();
+                  }
+
+                  firstStr = firstStr.replace(/\n/g, ' ').trim();
+                  secondStr = secondStr.replace(/\n/g, ' ').trim();
+
+                  // 「山田(陽)」や「山田（陽）」を「山田陽」に置換
+                  firstStr = firstStr.replace(/山田[（\(]陽[）\)]/g, '山田陽');
+                  secondStr = secondStr.replace(/山田[（\(]陽[）\)]/g, '山田陽');
+
+                  // 2nd Callの全体が（）や()で囲まれていれば除去
+                  if (/^[（\(].*[）\)]$/.test(secondStr)) {
+                    secondStr = secondStr.slice(1, -1).trim();
+                  }
+
+                  // 取得した値をセット
+                  newBatchData[dateStr] = {
+                    first: firstStr || newBatchData[dateStr].first,
+                    second: secondStr || newBatchData[dateStr].second
+                  };
+                }
+              }
+            });
+          });
+
+          setBatchOnCalls(newBatchData);
+          alert('Excelファイルの読み込みが完了しました。\n内容を確認し、問題なければ「一括保存」を押してください。');
+        } catch (error) {
+          console.error('Error reading Excel file:', error);
+          alert('ファイルの読み込みに失敗しました。対応する形式のExcelファイルか確認してください。');
+        } finally {
+          setIsBatchSaving(false);
+          event.target.value = ''; // 選択クリア
         }
       };
 
@@ -2699,7 +2791,7 @@
           {showBatchOnCallModal && (
             <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm print:hidden">
               <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-indigo-50">
+                <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-indigo-50 shrink-0">
                   <h3 className="font-bold text-base flex items-center gap-1.5 text-indigo-800">
                     <IconClock className="w-5 h-5" />
                     {selectedMonth}月の日中当番一括入力
@@ -2711,6 +2803,30 @@
                   >
                     <IconX className="w-5 h-5" />
                   </button>
+                </div>
+
+                <div className="p-4 bg-white border-b border-slate-200 shrink-0">
+                  <div className="bg-indigo-50/50 border border-indigo-200 rounded-lg p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div>
+                      <h4 className="font-bold text-indigo-800 text-sm flex items-center gap-1.5">
+                        <IconUpload className="w-4 h-4 text-indigo-600" /> Excelから自動読込
+                      </h4>
+                      <p className="text-xs text-indigo-600 mt-1 leading-relaxed">
+                        カレンダー形式の当番表(.xlsx)から読み込みます。<br/>
+                        （日付セルの1段下が1st Call、2段下が2nd Callとして抽出され、2ndのカッコは自動で外れます）
+                      </p>
+                    </div>
+                    <label className={`shrink-0 cursor-pointer border px-4 py-2 rounded text-sm font-bold transition-colors shadow-sm ${isBatchSaving ? 'bg-slate-100 border-slate-300 text-slate-400' : 'bg-white border-indigo-300 hover:bg-indigo-100 text-indigo-700'}`}>
+                      {isBatchSaving ? '読込中...' : 'ファイルを選択'}
+                      <input 
+                        type="file" 
+                        accept=".xlsx"
+                        className="hidden"
+                        onChange={handleFileUpload}
+                        disabled={isBatchSaving}
+                      />
+                    </label>
+                  </div>
                 </div>
                 
                 <div className="p-4 overflow-y-auto bg-slate-50 flex-1">
