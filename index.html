@@ -2043,14 +2043,14 @@
                     className="flex items-center justify-center gap-1.5 bg-white border border-indigo-300 text-indigo-700 hover:bg-indigo-50 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm w-full sm:w-auto"
                   >
                     <IconClock className="w-3.5 h-3.5" />
-                    当番一括入力
+                    日中当番一括入力
                   </button>
                   <button 
                     onClick={() => setShowStatsModal(true)}
                     className="flex items-center justify-center gap-1.5 bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm w-full sm:w-auto"
                   >
                     <IconBarChart className="w-3.5 h-3.5" />
-                    当番・新患集計
+                    新患集計
                   </button>
                   <button 
                     onClick={() => setShowHistoryModal(true)}
@@ -2497,7 +2497,7 @@
                 <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-emerald-50">
                   <h3 className="font-bold text-base flex items-center gap-1.5 text-emerald-800">
                     <IconBarChart className="w-5 h-5" />
-                    担当回数集計
+                    新患担当回数集計
                   </h3>
                   <button 
                     onClick={() => setShowStatsModal(false)}
@@ -2507,31 +2507,12 @@
                   </button>
                 </div>
                 
-                {/* タブ切り替え */}
-                <div className="flex border-b border-slate-200 bg-white">
-                  <button 
-                    onClick={() => setStatsTab('new')}
-                    className={`flex-1 py-3 text-sm font-bold border-b-2 transition-colors ${statsTab === 'new' ? 'border-emerald-500 text-emerald-700 bg-emerald-50/30' : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
-                  >
-                    新患のみ
-                  </button>
-                  <button 
-                    onClick={() => setStatsTab('combined')}
-                    className={`flex-1 py-3 text-sm font-bold border-b-2 transition-colors ${statsTab === 'combined' ? 'border-blue-500 text-blue-700 bg-blue-50/30' : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
-                  >
-                    日中当番 ＋ 新患
-                  </button>
-                </div>
-                
                 <div className="p-4 overflow-y-auto bg-slate-50 flex-1">
                   {(() => {
                     const stats = getStats();
-                    const isCombined = statsTab === 'combined';
                     
                     const sortedData = [...stats.data].sort((a, b) => {
-                      const totalA = isCombined ? a.total_combined : a.total_new;
-                      const totalB = isCombined ? b.total_combined : b.total_new;
-                      return totalB - totalA || a.name.localeCompare(b.name);
+                      return b.total_new - a.total_new || a.name.localeCompare(b.name);
                     });
 
                     if (sortedData.length === 0) {
@@ -2541,26 +2522,26 @@
                     return (
                       <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
                         <table className="w-full text-sm text-left">
-                          <thead className={`border-b border-slate-200 ${isCombined ? 'bg-blue-50 text-blue-800' : 'bg-slate-100 text-slate-600'}`}>
+                          <thead className="border-b border-slate-200 bg-slate-100 text-slate-600">
                             <tr>
                               <th className="p-3 font-bold">担当医</th>
                               <th className="p-3 font-bold text-center w-20">{stats.monthLabels[0]}</th>
                               <th className="p-3 font-bold text-center w-20">{stats.monthLabels[1]}</th>
                               <th className="p-3 font-bold text-center w-20">{stats.monthLabels[2]}</th>
-                              <th className={`p-3 font-bold text-center w-20 ${isCombined ? 'text-blue-700 bg-blue-100/50' : 'text-emerald-700 bg-emerald-50/50'}`}>合計</th>
+                              <th className="p-3 font-bold text-center w-20 text-emerald-700 bg-emerald-50/50">合計</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                             {sortedData.map(item => {
-                              const total = isCombined ? item.total_combined : item.total_new;
+                              const total = item.total_new;
                               if (total === 0) return null;
                               return (
                                 <tr key={item.name} className="hover:bg-slate-50 transition-colors">
                                   <td className="p-3 font-bold text-slate-800">{item.name}</td>
-                                  <td className="p-3 text-center text-slate-600">{isCombined ? item.m2_combined : item.m2_new || '-'}</td>
-                                  <td className="p-3 text-center text-slate-600">{isCombined ? item.m1_combined : item.m1_new || '-'}</td>
-                                  <td className="p-3 text-center text-slate-600">{isCombined ? item.m0_combined : item.m0_new || '-'}</td>
-                                  <td className={`p-3 text-center font-bold ${isCombined ? 'text-blue-600 bg-blue-50/30' : 'text-emerald-600 bg-emerald-50/30'}`}>{total}</td>
+                                  <td className="p-3 text-center text-slate-600">{item.m2_new || '-'}</td>
+                                  <td className="p-3 text-center text-slate-600">{item.m1_new || '-'}</td>
+                                  <td className="p-3 text-center text-slate-600">{item.m0_new || '-'}</td>
+                                  <td className="p-3 text-center font-bold text-emerald-600 bg-emerald-50/30">{total}</td>
                                 </tr>
                               );
                             })}
@@ -2721,7 +2702,7 @@
                 <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-indigo-50">
                   <h3 className="font-bold text-base flex items-center gap-1.5 text-indigo-800">
                     <IconClock className="w-5 h-5" />
-                    {selectedMonth}月の当番一括入力
+                    {selectedMonth}月の日中当番一括入力
                   </h3>
                   <button 
                     onClick={() => setShowBatchOnCallModal(false)}
