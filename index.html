@@ -434,12 +434,21 @@
       });
     });
 
-    const getRoleColor = (role, isNewBooth = false) => {
+    const PM_BOOTHS = ['若林午後CS', '若林CS', '午後CS', 'ゆうファミリー', '循環器センター', '豊里病院当直', '循環器病センターEGD'];
+    const getPeriod = (item) => {
+      if (!item) return 'AM';
+      if (item.isPM !== undefined) return item.isPM ? 'PM' : 'AM';
+      const role = typeof item === 'string' ? item : (item.role || '');
+      return (PM_BOOTHS.includes(role) || role.includes('午後')) ? 'PM' : 'AM';
+    };
+
+    const getRoleColor = (item, isNewBooth = false) => {
+      const role = typeof item === 'string' ? item : (item.role || '');
       if (role === '休暇者') return 'bg-rose-100 text-rose-800 border-rose-300';
       if (isNewBooth) return 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-400 shadow-[0_0_10px_rgba(217,70,239,0.3)] ring-1 ring-fuchsia-300';
       
-      const pmBooths = ['若林CS', '循環器病センターEGD', 'ゆうファミリー'];
-      if (pmBooths.includes(role)) return 'bg-violet-100 text-violet-800 border-violet-300'; // 午後枠の統一配色
+      const isPM = getPeriod(item) === 'PM';
+      if (isPM) return 'bg-violet-100 text-violet-800 border-violet-300'; // 午後枠の統一配色
 
       const externals = ['若林', '女川', '涌谷', '一番町', '健診', '刈田', '真壁', '矢本', '渡辺', '佐藤', 'ゆう', '高砂', '循環器', '葵会', '米谷', '南相馬', '豊里'];
       if (externals.some(kw => role.includes(kw))) return 'bg-stone-100 text-stone-700 border-stone-300'; 
@@ -453,7 +462,8 @@
       return 'bg-white text-slate-700 border-slate-300';
     };
 
-    const getRoleExcelStyle = (role, isNewBooth = false) => {
+    const getRoleExcelStyle = (item, isNewBooth = false) => {
+      const role = typeof item === 'string' ? item : (item.role || '');
       let bgColor = 'FFFFFFFF'; // white
       let fontColor = 'FF000000'; // black
 
@@ -462,9 +472,9 @@
       } else if (isNewBooth) {
         bgColor = 'FFFAEAFF'; // fuchsia-100
       } else {
-        const pmBooths = ['若林CS', '循環器病センターEGD', 'ゆうファミリー'];
+        const isPM = getPeriod(item) === 'PM';
         const externals = ['若林', '女川', '涌谷', '一番町', '健診', '刈田', '真壁', '矢本', '渡辺', '佐藤', 'ゆう', '高砂', '循環器', '葵会', '米谷', '南相馬', '豊里'];
-        if (pmBooths.includes(role)) {
+        if (isPM) {
           bgColor = 'FFEDE9FE'; // violet-100 (午後枠用)
         } else if (externals.some(kw => role.includes(kw))) {
           bgColor = 'FFF5F5F4'; // stone-100
@@ -488,9 +498,54 @@
       return { bgColor, fontColor };
     };
 
-    const PM_BOOTHS = ['若林午後CS', '若林CS', '午後CS', 'ゆうファミリー', '循環器センター', '豊里病院当直', '循環器病センターEGD'];
-    const getPeriod = (role) => (PM_BOOTHS.includes(role) || role.includes('午後')) ? 'PM' : 'AM';
     const VALID_EGD2_STAFF = ['福士', '片山', '金', '伊藤', '宮下', '大沼', '早川', '及川', '永井', '佐々木'];
+
+    // --- 追加: 週別表示などで枠を日別表示と同じ順序に並べるためのヘルパー関数 ---
+    const getSortedRoles = (targetDates, weekSchedules, defaultSchedulesMap, masterOrder) => {
+      const roleScores = {};
+      // 基本となる並び順（MASTER_ROLE_ORDER）に 10 刻みのスコアを振る
+      masterOrder.forEach((role, idx) => {
+        roleScores[role] = idx * 10;
+      });
+
+      const allRolesSet = new Set();
+      
+      const processDayData = (dayData) => {
+        if (!dayData) return;
+        let lastMasterScore = -10;
+        let offset = 1;
+        dayData.forEach((item) => {
+          allRolesSet.add(item.role);
+          // マスター順に存在する枠なら基準スコアを更新
+          if (roleScores[item.role] !== undefined && roleScores[item.role] % 10 === 0) {
+            lastMasterScore = roleScores[item.role];
+            offset = 1;
+          } else {
+            // 追加枠（臨時枠など）は、直前のマスター枠のスコア＋オフセットで位置を決定
+            if (roleScores[item.role] === undefined) {
+              roleScores[item.role] = lastMasterScore + offset;
+            }
+            offset++;
+          }
+        });
+      };
+
+      // デフォルトと現在のスケジュール両方の出現位置からスコアを算出
+      targetDates.forEach((d, i) => {
+        processDayData(defaultSchedulesMap[d]);
+        processDayData(weekSchedules[i]);
+      });
+
+      // 算出したスコア順に並び替え
+      return Array.from(allRolesSet).sort((a, b) => {
+        if (a === '休暇者') return -1;
+        if (b === '休暇者') return 1;
+        const scoreA = roleScores[a] !== undefined ? roleScores[a] : 9999;
+        const scoreB = roleScores[b] !== undefined ? roleScores[b] : 9999;
+        if (scoreA !== scoreB) return scoreA - scoreB;
+        return a.localeCompare(b);
+      });
+    };
 
     const checkConflicts = (booths) => {
       const staffMap = {}; 
@@ -504,7 +559,7 @@
           if (/^[✕☓×✗xX]+$/.test(n)) return false; 
           return true;
         });
-        const period = getPeriod(booth.role);
+        const period = getPeriod(booth);
         names.forEach(name => {
           if (!staffMap[name]) staffMap[name] = [];
           staffMap[name].push({ role: booth.role, period, localIndex });
@@ -601,10 +656,13 @@
 
     function App() {
       const [user, setUser] = useState(null);
-      const [schedules, setSchedules] = useState(defaultSchedules);
-      const [holidays, setHolidays] = useState(defaultHolidays);
-      const [onCalls, setOnCalls] = useState(defaultOnCalls);
-      const [notices, setNotices] = useState(defaultNotices);
+      // 基本パターンをFirestoreから読み込むためのステート
+      const [customDefaultPatterns, setCustomDefaultPatterns] = useState({});
+
+      const [schedules, setSchedules] = useState({});
+      const [holidays, setHolidays] = useState({});
+      const [onCalls, setOnCalls] = useState({});
+      const [notices, setNotices] = useState({});
       const [schedulesMetadata, setSchedulesMetadata] = useState({});
       
       const [selectedMonth, setSelectedMonth] = useState(8);
@@ -623,7 +681,6 @@
       const [isSaving, setIsSaving] = useState(false);
       const [showLoginModal, setShowLoginModal] = useState(false);
       const [showHistoryModal, setShowHistoryModal] = useState(false);
-      const [showStatsModal, setShowStatsModal] = useState(false);
       
       // 一括入力・アラート一覧用のステート
       const [showBatchOnCallModal, setShowBatchOnCallModal] = useState(false);
@@ -632,14 +689,139 @@
       const [showAlertsModal, setShowAlertsModal] = useState(false);
       const [allAlerts, setAllAlerts] = useState([]);
 
-      const [statsTab, setStatsTab] = useState('new');
+      const [showStatsModal, setShowStatsModal] = useState(false);
+      const [statsTab, setStatsTab] = useState('new'); // 'new' または 'combined'
       const [password, setPassword] = useState('');
       const [loginError, setLoginError] = useState('');
+
+      // 基本パターン編集用のステート
+      const [showPatternModal, setShowPatternModal] = useState(false);
+      const [patternMonth, setPatternMonth] = useState('');
+      const [patternWeek, setPatternWeek] = useState(0);
+      const [patternDay, setPatternDay] = useState(0);
+      const [editingPatternData, setEditingPatternData] = useState([]);
+      const [isSavingPattern, setIsSavingPattern] = useState(false);
 
       const [showStickyNav, setShowStickyNav] = useState(true);
       const [lastScrollY, setLastScrollY] = useState(0);
       
       const todayStr = getTodayStr();
+
+      // Firebaseから基本パターンを購読
+      useEffect(() => {
+        if (!user) return;
+        const patternsRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'default_patterns');
+        const unsub = onSnapshot(patternsRef, (snapshot) => {
+          const patterns = {};
+          snapshot.forEach(doc => {
+            patterns[doc.id] = doc.data();
+          });
+          setCustomDefaultPatterns(patterns);
+        });
+        return () => unsub();
+      }, [user]);
+
+      // 現在のパターン（ハードコード＋カスタム）からデフォルトスケジュールを動的に生成
+      const defaultSchedules = React.useMemo(() => {
+        const result = {};
+        const splitDate = new Date('2026-10-01');
+
+        weeksData.forEach((week) => {
+          week.dates.forEach((dateStr) => {
+            const d = new Date(dateStr);
+            const weekIndex = getWeekOfMonthIndex(d);
+            const dayIndex = d.getDay() - 1;
+            
+            if (dayIndex >= 0 && dayIndex <= 4 && weekIndex >= 0 && weekIndex <= 4) {
+               const yyyyMm = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+               const customDoc = customDefaultPatterns[yyyyMm];
+               const customKey = `week${weekIndex}_day${dayIndex}`;
+               
+               // カスタムパターンが設定されていて、削除フラグ（"RESET"）でなければ適用
+               if (customDoc && customDoc[customKey] && customDoc[customKey] !== "RESET") {
+                 try {
+                   result[dateStr] = JSON.parse(customDoc[customKey]);
+                   return; // カスタムパターンを適用して次の日へ
+                 } catch(e) { console.error(e); }
+               }
+               
+               // カスタムパターンがなければ初期ハードコード値を適用
+               if (d < splitDate) {
+                 result[dateStr] = JSON.parse(JSON.stringify(monthlyPatternsUntilSep[weekIndex][dayIndex]));
+               } else {
+                 result[dateStr] = JSON.parse(JSON.stringify(monthlyPatternsFromOct[weekIndex][dayIndex]));
+               }
+            }
+          });
+        });
+        return result;
+      }, [customDefaultPatterns]);
+
+      const defaultHolidays = React.useMemo(() => {
+        const result = {};
+        weeksData.forEach(week => {
+          week.dates.forEach(d => { result[d] = PUBLIC_HOLIDAYS.includes(d); });
+        });
+        return result;
+      }, []);
+
+      const defaultOnCalls = React.useMemo(() => {
+        const result = {};
+        weeksData.forEach(week => {
+          week.dates.forEach(d => { result[d] = { first: '', second: '' }; });
+        });
+        return result;
+      }, []);
+
+      const defaultNotices = React.useMemo(() => {
+        const result = {};
+        weeksData.forEach(week => {
+          week.dates.forEach(d => { result[d] = ''; });
+        });
+        return result;
+      }, []);
+
+      useEffect(() => {
+        if (!user) return;
+        const schedulesRef = collection(db, 'artifacts', APP_ID, 'public', 'data', COLLECTION_NAME);
+        
+        const allDates = weeksData.flatMap(w => w.dates);
+        const unsubscribers = allDates.map(dateKey => {
+          const docRef = doc(schedulesRef, dateKey);
+          return onSnapshot(docRef, 
+            (snapshot) => {
+              if (snapshot.exists()) {
+                const data = snapshot.data();
+                const parsedStaffData = JSON.parse(data.staffData);
+                setSchedules(prev => ({ ...prev, [dateKey]: parsedStaffData }));
+                setHolidays(prev => ({ ...prev, [dateKey]: data.isHoliday !== undefined ? data.isHoliday : defaultHolidays[dateKey] }));
+                setOnCalls(prev => ({ ...prev, [dateKey]: data.onCallData || { first: '', second: '' } }));
+                setNotices(prev => ({ ...prev, [dateKey]: data.notice || '' }));
+                setSchedulesMetadata(prev => ({ 
+                  ...prev, 
+                  [dateKey]: { 
+                    updatedAt: data.updatedAt, 
+                    updatedBy: data.updatedBy,
+                    lastChanges: data.lastChanges || []
+                  } 
+                }));
+              } else {
+                setSchedules(prev => { const next = {...prev}; delete next[dateKey]; return next; });
+                setHolidays(prev => { const next = {...prev}; delete next[dateKey]; return next; });
+                setOnCalls(prev => { const next = {...prev}; delete next[dateKey]; return next; });
+                setNotices(prev => { const next = {...prev}; delete next[dateKey]; return next; });
+                setSchedulesMetadata(prev => { const next = {...prev}; delete next[dateKey]; return next; });
+              }
+              setIsLoading(false);
+            },
+            (error) => {
+              console.error(`Error fetching schedule for ${dateKey}:`, error);
+              setIsLoading(false);
+            }
+          );
+        });
+        return () => unsubscribers.forEach(unsub => unsub());
+      }, [user, defaultHolidays]);
 
       useEffect(() => {
         let initialDate = weeksData[0].dates[0];
@@ -690,47 +872,6 @@
       }, []);
 
       useEffect(() => {
-        if (!user) return;
-        const schedulesRef = collection(db, 'artifacts', APP_ID, 'public', 'data', COLLECTION_NAME);
-        
-        const unsubscribers = Object.keys(defaultSchedules).map(dateKey => {
-          const docRef = doc(schedulesRef, dateKey);
-          return onSnapshot(docRef, 
-            (snapshot) => {
-              if (snapshot.exists()) {
-                const data = snapshot.data();
-                const parsedStaffData = JSON.parse(data.staffData);
-                setSchedules(prev => ({ ...prev, [dateKey]: parsedStaffData }));
-                setHolidays(prev => ({ ...prev, [dateKey]: data.isHoliday !== undefined ? data.isHoliday : defaultHolidays[dateKey] }));
-                setOnCalls(prev => ({ ...prev, [dateKey]: data.onCallData || { first: '', second: '' } }));
-                setNotices(prev => ({ ...prev, [dateKey]: data.notice || '' }));
-                setSchedulesMetadata(prev => ({ 
-                  ...prev, 
-                  [dateKey]: { 
-                    updatedAt: data.updatedAt, 
-                    updatedBy: data.updatedBy,
-                    lastChanges: data.lastChanges || []
-                  } 
-                }));
-              } else {
-                setSchedules(prev => ({ ...prev, [dateKey]: defaultSchedules[dateKey] }));
-                setHolidays(prev => ({ ...prev, [dateKey]: defaultHolidays[dateKey] }));
-                setOnCalls(prev => ({ ...prev, [dateKey]: { first: '', second: '' } }));
-                setNotices(prev => ({ ...prev, [dateKey]: '' }));
-                setSchedulesMetadata(prev => ({ ...prev, [dateKey]: null }));
-              }
-              setIsLoading(false);
-            },
-            (error) => {
-              console.error(`Error fetching schedule for ${dateKey}:`, error);
-              setIsLoading(false);
-            }
-          );
-        });
-        return () => unsubscribers.forEach(unsub => unsub());
-      }, [user]);
-
-      useEffect(() => {
         const handleScroll = () => {
           const currentScrollY = window.scrollY;
           
@@ -761,17 +902,19 @@
       };
       const handleDateChange = (date) => setSelectedDate(date);
 
+      // 動的生成されたデフォルトデータをフォールバックとして使用
       const activeData = pendingChanges[selectedDate] 
         ? pendingChanges[selectedDate] 
-        : JSON.parse(JSON.stringify(schedules[selectedDate] || defaultSchedules[selectedDate]));
+        : (schedules[selectedDate] ? JSON.parse(JSON.stringify(schedules[selectedDate])) : JSON.parse(JSON.stringify(defaultSchedules[selectedDate] || [])));
 
-      const activeIsHoliday = pendingHolidays[selectedDate] !== undefined ? pendingHolidays[selectedDate] : holidays[selectedDate];
-      const activeOnCall = pendingOnCalls[selectedDate] !== undefined ? pendingOnCalls[selectedDate] : onCalls[selectedDate] || { first: '', second: '' };
-      const activeNotice = pendingNotices[selectedDate] !== undefined ? pendingNotices[selectedDate] : (notices[selectedDate] || '');
+      const activeIsHoliday = pendingHolidays[selectedDate] !== undefined ? pendingHolidays[selectedDate] : (holidays[selectedDate] !== undefined ? holidays[selectedDate] : defaultHolidays[selectedDate]);
+      const activeOnCall = pendingOnCalls[selectedDate] !== undefined ? pendingOnCalls[selectedDate] : (onCalls[selectedDate] || defaultOnCalls[selectedDate] || { first: '', second: '' });
+      const activeNotice = pendingNotices[selectedDate] !== undefined ? pendingNotices[selectedDate] : (notices[selectedDate] || defaultNotices[selectedDate] || '');
 
       const updatePendingChanges = (newData) => {
         setPendingChanges(prev => ({ ...prev, [selectedDate]: newData }));
       };
+      
       const handleEditStart = () => {
         setIsEditMode(true);
         setViewMode('day');
@@ -812,6 +955,7 @@
           updatePendingChanges(newData);
         }
       };
+
       const handleHolidayToggle = () => {
         setPendingHolidays(prev => ({ ...prev, [selectedDate]: !activeIsHoliday }));
       };
@@ -834,16 +978,16 @@
           
           const promises = Array.from(changedDates).map(dateKey => {
             const docRef = doc(schedulesRef, dateKey);
-            const oldStaffData = schedules[dateKey] || defaultSchedules[dateKey];
+            const oldStaffData = schedules[dateKey] || defaultSchedules[dateKey] || [];
             const newStaffData = pendingChanges[dateKey] ? pendingChanges[dateKey] : oldStaffData;
             
-            const oldHol = holidays[dateKey];
+            const oldHol = holidays[dateKey] !== undefined ? holidays[dateKey] : defaultHolidays[dateKey];
             const newHol = pendingHolidays[dateKey] !== undefined ? pendingHolidays[dateKey] : oldHol;
             
-            const oldOnCall = onCalls[dateKey] || {first: '', second: ''};
+            const oldOnCall = onCalls[dateKey] || defaultOnCalls[dateKey] || {first: '', second: ''};
             const newOnCall = pendingOnCalls[dateKey] !== undefined ? pendingOnCalls[dateKey] : oldOnCall;
             
-            const oldNotice = notices[dateKey] || '';
+            const oldNotice = notices[dateKey] || defaultNotices[dateKey] || '';
             const newNotice = pendingNotices[dateKey] !== undefined ? pendingNotices[dateKey] : oldNotice;
 
             const changes = [];
@@ -985,7 +1129,7 @@
           if (!currentStaff) return;
           
           const currentBoothNames = currentStaff.split(/[\s,、・]+|or/).map(n => getPureName(n)).filter(n => n.length > 0 && n !== 'なし' && !/^[✕☓×✗xX]+$/.test(n));
-          const currentBoothPeriod = getPeriod(item.role);
+          const currentBoothPeriod = getPeriod(item);
 
           const conflictLeaves = pLeaves.filter(leave => {
             if (!currentBoothNames.includes(leave.name)) return false;
@@ -1170,6 +1314,110 @@
         }
       };
 
+      // --- 基本担当パターンの設定機能 ---
+      const patternMonthOptions = React.useMemo(() => {
+        const options = [];
+        const now = new Date();
+        now.setMonth(now.getMonth() - 2);
+        for(let i=0; i<8; i++) {
+          const yyyy = now.getFullYear();
+          const mm = String(now.getMonth() + 1).padStart(2, '0');
+          options.push(`${yyyy}-${mm}`);
+          now.setMonth(now.getMonth() + 1);
+        }
+        return options;
+      }, []);
+
+      const openPatternModal = () => {
+        const initialMonth = `${new Date(selectedDate).getFullYear()}-${String(selectedMonth).padStart(2, '0')}`;
+        setPatternMonth(initialMonth);
+        setPatternWeek(0);
+        setPatternDay(0);
+        setShowPatternModal(true);
+      };
+
+      useEffect(() => {
+        if (!showPatternModal) return;
+        const customDoc = customDefaultPatterns[patternMonth];
+        const customKey = `week${patternWeek}_day${patternDay}`;
+        
+        if (customDoc && customDoc[customKey] && customDoc[customKey] !== "RESET") {
+          try {
+            setEditingPatternData(JSON.parse(customDoc[customKey]));
+            return;
+          } catch(e) {}
+        }
+        
+        // ハードコードへフォールバック
+        const splitDate = new Date('2026-10-01');
+        const targetDateStr = `${patternMonth}-01`;
+        if (new Date(targetDateStr) < splitDate) {
+           setEditingPatternData(JSON.parse(JSON.stringify(monthlyPatternsUntilSep[patternWeek][patternDay])));
+        } else {
+           setEditingPatternData(JSON.parse(JSON.stringify(monthlyPatternsFromOct[patternWeek][patternDay])));
+        }
+      }, [showPatternModal, patternMonth, patternWeek, patternDay, customDefaultPatterns]);
+
+      const handleSavePattern = async () => {
+        if (!user) return;
+        setIsSavingPattern(true);
+        try {
+          const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'default_patterns', patternMonth);
+          const updateData = {
+            [`week${patternWeek}_day${patternDay}`]: JSON.stringify(editingPatternData),
+            updatedAt: new Date().toISOString(),
+            updatedBy: user.uid
+          };
+          await setDoc(docRef, updateData, { merge: true });
+          alert('この曜日の基本担当パターンを保存しました。\n（この月のカレンダー全体に自動で反映されます）');
+        } catch(e) {
+          console.error(e);
+          alert('保存に失敗しました。');
+        } finally {
+          setIsSavingPattern(false);
+        }
+      };
+
+      const handleResetPattern = async () => {
+        if (!user) return;
+        if (!confirm('この曜日の基本担当をシステムの初期値にリセットしますか？')) return;
+        setIsSavingPattern(true);
+        try {
+          const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'default_patterns', patternMonth);
+          const updateData = {
+            [`week${patternWeek}_day${patternDay}`]: "RESET",
+            updatedAt: new Date().toISOString(),
+            updatedBy: user.uid
+          };
+          await setDoc(docRef, updateData, { merge: true });
+        } catch(e) {
+          console.error(e);
+        } finally {
+          setIsSavingPattern(false);
+        }
+      };
+
+      const handlePatternChange = (index, field, value) => {
+        const newData = [...editingPatternData];
+        newData[index] = { ...newData[index], [field]: value };
+        setEditingPatternData(newData);
+      };
+      
+      const handlePatternMove = (index, direction) => {
+        const newData = [...editingPatternData];
+        if (direction === 'up' && index > 1) { // 0は休暇者なので1から
+          const temp = newData[index];
+          newData[index] = newData[index - 1];
+          newData[index - 1] = temp;
+          setEditingPatternData(newData);
+        } else if (direction === 'down' && index < newData.length - 1) {
+          const temp = newData[index];
+          newData[index] = newData[index + 1];
+          newData[index + 1] = temp;
+          setEditingPatternData(newData);
+        }
+      };
+
       const openAlertsModal = () => {
         const todayDate = new Date(todayStr);
         const allDates = weeksData.flatMap(w => w.dates).filter(d => new Date(d) >= todayDate);
@@ -1317,52 +1565,11 @@
 
         const exportSchedules = dates.map(d => pendingChanges[d] || schedules[d] || defaultSchedules[d] || null);
         const exportDefaultSchedules = dates.map(d => defaultSchedules[d] || null);
-        const exportHolidays = dates.map(d => pendingHolidays[d] !== undefined ? pendingHolidays[d] : (holidays[d] || false));
-        const exportOnCalls = dates.map(d => pendingOnCalls[d] !== undefined ? pendingOnCalls[d] : (onCalls[d] || {first: '', second: ''}));
+        const exportHolidays = dates.map(d => pendingHolidays[d] !== undefined ? pendingHolidays[d] : (holidays[d] !== undefined ? holidays[d] : defaultHolidays[d]));
+        const exportOnCalls = dates.map(d => pendingOnCalls[d] !== undefined ? pendingOnCalls[d] : (onCalls[d] || defaultOnCalls[d] || {first: '', second: ''}));
         
-        // --- ブースの並び順を日別表示（変更された配列）に合わせて計算 ---
-        const roleAvgIndex = {};
-        const allRolesSet = new Set();
-
-        exportSchedules.forEach((dayData, i) => {
-          if (!exportHolidays[i] && dayData) {
-            dayData.forEach((item, idx) => {
-              allRolesSet.add(item.role);
-              if (!roleAvgIndex[item.role]) roleAvgIndex[item.role] = { sum: 0, count: 0 };
-              roleAvgIndex[item.role].sum += idx;
-              roleAvgIndex[item.role].count += 1;
-            });
-          }
-        });
-
-        exportDefaultSchedules.forEach((dayData, i) => {
-          if (dayData) {
-            dayData.forEach((item, idx) => {
-              allRolesSet.add(item.role);
-              if (!roleAvgIndex[item.role]) {
-                roleAvgIndex[item.role] = { sum: idx, count: 1 };
-              }
-            });
-          }
-        });
-
-        const allRoles = Array.from(allRolesSet).sort((a, b) => {
-          if (a === '休暇者') return -1;
-          if (b === '休暇者') return 1;
-          
-          const avgA = roleAvgIndex[a] ? (roleAvgIndex[a].sum / roleAvgIndex[a].count) : 999;
-          const avgB = roleAvgIndex[b] ? (roleAvgIndex[b].sum / roleAvgIndex[b].count) : 999;
-          
-          if (avgA !== avgB) return avgA - avgB;
-          
-          const indexA = MASTER_ROLE_ORDER.indexOf(a);
-          const indexB = MASTER_ROLE_ORDER.indexOf(b);
-          if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-          if (indexA !== -1) return -1;
-          if (indexB !== -1) return 1;
-          return a.localeCompare(b);
-        });
-        // -----------------------------------------------------------------
+        // ヘルパー関数を使用してExcel出力の並び順を決定
+        const allRoles = getSortedRoles(dates, exportSchedules, defaultSchedules, MASTER_ROLE_ORDER);
 
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet("スケジュール");
@@ -1461,7 +1668,8 @@
             const defaultStaff = defaultItem ? defaultItem.staff : "";
             const isNewBooth = !defaultItem && currentItem;
 
-            const { bgColor, fontColor } = getRoleExcelStyle(role, isNewBooth);
+            const styleTarget = currentItem || defaultItem || role;
+            const { bgColor, fontColor } = getRoleExcelStyle(styleTarget, isNewBooth);
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
 
             if (!currentItem && !defaultItem) {
@@ -1564,7 +1772,7 @@
           const currentStaff = item.staff;
           if(!currentStaff) return false;
           const currentBoothNames = currentStaff.split(/[\s,、・]+|or/).map(n => getPureName(n)).filter(n => n.length > 0);
-          const currentBoothPeriod = getPeriod(item.role);
+          const currentBoothPeriod = getPeriod(item);
           const conflictLeaves = parsedLeaves.filter(leave => {
             if (!currentBoothNames.includes(leave.name)) return false;
             return leave.leavePeriod === 'ALL' || leave.leavePeriod === currentBoothPeriod;
@@ -1602,7 +1810,7 @@
           
           const dbConf = checkConflicts(bData);
           
-          const onCall = weekOnCalls[i] || {first: '', second: ''};
+          const onCall = weekOnCalls[i] || defaultOnCalls[d] || {first: '', second: ''};
           const oc1E = checkOnCallConflicts(onCall.first, bData, pLeaves, false);
           const oc2E = checkOnCallConflicts(onCall.second, bData, pLeaves, true);
           
@@ -1615,7 +1823,7 @@
             const currentStaff = item.staff;
             if (currentStaff && item.role !== '上部EUS' && item.role !== '豊里病院当直') {
               const currentBoothNames = currentStaff.split(/[\s,、・]+|or/).map(n => getPureName(n)).filter(n => n.length > 0 && n !== 'なし' && !/^[✕☓×✗xX]+$/.test(n));
-              const currentBoothPeriod = getPeriod(item.role);
+              const currentBoothPeriod = getPeriod(item);
 
               const conflictLeaves = pLeaves.filter(leave => {
                 if (!currentBoothNames.includes(leave.name)) return false;
@@ -1688,48 +1896,8 @@
           });
         };
 
-        // --- ブースの並び順を日別表示（変更された配列）に合わせて計算 ---
-        const roleAvgIndex = {};
-        const allRolesSet = new Set();
-        
-        weekSchedules.forEach((dayData, dayIdx) => {
-          if (!weekHolidays[dayIdx] && dayData) {
-            dayData.forEach((item, itemIdx) => {
-              allRolesSet.add(item.role);
-              if (!roleAvgIndex[item.role]) roleAvgIndex[item.role] = { sum: 0, count: 0 };
-              roleAvgIndex[item.role].sum += itemIdx;
-              roleAvgIndex[item.role].count += 1;
-            });
-          }
-        });
-
-        weekDefaultSchedules.forEach((dayData, dayIdx) => {
-           if (dayData) {
-              dayData.forEach((item, itemIdx) => {
-                 allRolesSet.add(item.role);
-                 if (!roleAvgIndex[item.role]) {
-                    roleAvgIndex[item.role] = { sum: itemIdx, count: 1 };
-                 }
-              });
-           }
-        });
-
-        const allRoles = Array.from(allRolesSet).sort((a, b) => {
-          if (a === '休暇者') return -1;
-          if (b === '休暇者') return 1;
-          
-          const avgA = roleAvgIndex[a] ? (roleAvgIndex[a].sum / roleAvgIndex[a].count) : 999;
-          const avgB = roleAvgIndex[b] ? (roleAvgIndex[b].sum / roleAvgIndex[b].count) : 999;
-          
-          if (avgA !== avgB) return avgA - avgB;
-          
-          const indexA = MASTER_ROLE_ORDER.indexOf(a);
-          const indexB = MASTER_ROLE_ORDER.indexOf(b);
-          if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-          if (indexA !== -1) return -1;
-          if (indexB !== -1) return 1;
-          return a.localeCompare(b);
-        });
+        // ヘルパー関数を使用して週別表示の並び順を決定（日別表示の並びを尊重）
+        const allRoles = getSortedRoles(weekDates, weekSchedules, defaultSchedules, MASTER_ROLE_ORDER);
 
         const isRoleNewBoothInWeek = (role) => {
           return weekDefaultSchedules.every(defData => {
@@ -1737,7 +1905,6 @@
             return !defData.some(d => d.role === role);
           });
         };
-        // -----------------------------------------------------------------
 
         let displayRoles = allRoles;
         let showFirstCall = true;
@@ -2152,11 +2319,18 @@
                     更新履歴
                   </button>
                   <button 
+                    onClick={openPatternModal}
+                    className="flex items-center justify-center gap-1.5 bg-white border border-indigo-400 text-indigo-700 hover:bg-indigo-50 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm w-full sm:w-auto"
+                  >
+                    <IconTable className="w-3.5 h-3.5" />
+                    基本出番表設定
+                  </button>
+                  <button 
                     onClick={handleEditStart}
                     className="flex items-center justify-center gap-1.5 bg-white border border-blue-600 text-blue-700 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded-md text-sm font-bold transition-colors w-full sm:w-auto shadow-sm"
                   >
                     <IconEdit className="w-3.5 h-3.5" />
-                    出番・枠を変更（日別）
+                    出番変更入力（臨時変更）
                   </button>
                 </div>
               </div>
@@ -2379,22 +2553,37 @@
                               isError ? 'bg-red-100/50' : isNewBooth ? 'bg-fuchsia-100/40 pl-3.5' : 'bg-slate-50/50'
                             }`}>
                               {isEditMode ? (
-                                <div className="flex items-center gap-2">
-                                  <input 
-                                    type="text" 
-                                    value={item.role}
-                                    onChange={(e) => handleRoleChange(dataIndex, e.target.value)}
-                                    className={`w-full border rounded px-2 py-1.5 text-xs font-bold outline-none transition-colors ${
-                                      isNewBooth ? 'bg-fuchsia-50 border-fuchsia-300 text-fuchsia-900 focus:border-fuchsia-500' : 'bg-white border-slate-300 text-slate-700 focus:border-blue-500'
-                                    }`}
-                                    placeholder="枠名を入力"
-                                  />
-                                  <button onClick={() => handleRemoveBooth(dataIndex)} className="text-slate-400 hover:text-red-500 p-1" title="枠を削除">
-                                    <IconTrash2 className="w-4 h-4" />
-                                  </button>
+                                <div className="flex flex-col gap-1.5 w-full">
+                                  <div className="flex items-center gap-2">
+                                    <input 
+                                      type="text" 
+                                      value={item.role}
+                                      onChange={(e) => handleRoleChange(dataIndex, e.target.value)}
+                                      className={`w-full border rounded px-2 py-1.5 text-xs font-bold outline-none transition-colors ${
+                                        isNewBooth ? 'bg-fuchsia-50 border-fuchsia-300 text-fuchsia-900 focus:border-fuchsia-500' : 'bg-white border-slate-300 text-slate-700 focus:border-blue-500'
+                                      }`}
+                                      placeholder="枠名を入力"
+                                    />
+                                    <button onClick={() => handleRemoveBooth(dataIndex)} className="text-slate-400 hover:text-red-500 p-1 shrink-0" title="枠を削除">
+                                      <IconTrash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                  <label className="flex items-center gap-1 text-[10px] text-slate-500 font-bold cursor-pointer w-fit pl-1 hover:text-indigo-600 transition-colors">
+                                    <input 
+                                      type="checkbox"
+                                      checked={getPeriod(item) === 'PM'}
+                                      onChange={(e) => {
+                                        const newData = [...activeData];
+                                        newData[dataIndex] = { ...newData[dataIndex], isPM: e.target.checked };
+                                        updatePendingChanges(newData);
+                                      }}
+                                      className="rounded border-slate-300 w-3 h-3 cursor-pointer"
+                                    />
+                                    午後枠として扱う
+                                  </label>
                                 </div>
                               ) : (
-                                <span className={`inline-block px-2 py-1 rounded text-xs font-bold border w-full sm:w-auto text-center sm:text-left ${getRoleColor(item.role, isNewBooth)}`}>
+                                <span className={`inline-block px-2 py-1 rounded text-xs font-bold border w-full sm:w-auto text-center sm:text-left ${getRoleColor(item, isNewBooth)}`}>
                                   {item.role}
                                 </span>
                               )}
@@ -2782,6 +2971,192 @@
                   >
                     閉じる
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 基本担当パターン設定モーダル */}
+          {showPatternModal && (
+            <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm print:hidden">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-indigo-50 shrink-0">
+                  <h3 className="font-bold text-base flex items-center gap-1.5 text-indigo-800">
+                    <IconTable className="w-5 h-5" />
+                    基本出番表設定
+                  </h3>
+                  <button 
+                    onClick={() => setShowPatternModal(false)}
+                    disabled={isSavingPattern}
+                    className="p-1 hover:bg-indigo-200 rounded text-indigo-600 transition-colors disabled:opacity-50"
+                  >
+                    <IconX className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <div className="p-4 bg-slate-100 border-b border-slate-200 shrink-0 flex flex-wrap gap-3 items-center">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-bold text-slate-600">対象月</label>
+                    <select 
+                      value={patternMonth} 
+                      onChange={(e) => setPatternMonth(e.target.value)}
+                      className="border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-indigo-500 font-bold text-sm bg-white"
+                    >
+                      {patternMonthOptions.map(opt => (
+                        <option key={opt} value={opt}>{opt.split('-')[0]}年{opt.split('-')[1]}月</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-bold text-slate-600">週</label>
+                    <select 
+                      value={patternWeek} 
+                      onChange={(e) => setPatternWeek(Number(e.target.value))}
+                      className="border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-indigo-500 font-bold text-sm bg-white"
+                    >
+                      <option value={0}>第1週</option>
+                      <option value={1}>第2週</option>
+                      <option value={2}>第3週</option>
+                      <option value={3}>第4週</option>
+                      <option value={4}>第5週</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-bold text-slate-600">曜日</label>
+                    <select 
+                      value={patternDay} 
+                      onChange={(e) => setPatternDay(Number(e.target.value))}
+                      className="border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-indigo-500 font-bold text-sm bg-white"
+                    >
+                      <option value={0}>月曜日</option>
+                      <option value={1}>火曜日</option>
+                      <option value={2}>水曜日</option>
+                      <option value={3}>木曜日</option>
+                      <option value={4}>金曜日</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="p-4 overflow-y-auto bg-slate-50 flex-1">
+                  <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                    <div className="bg-indigo-50 border-b border-indigo-200 px-4 py-2 text-sm font-bold text-indigo-800">
+                      休暇者
+                    </div>
+                    <div className="p-3 bg-white border-b border-slate-200">
+                      <input
+                        type="text"
+                        value={editingPatternData[0]?.staff || ''}
+                        onChange={(e) => handlePatternChange(0, 'staff', e.target.value)}
+                        placeholder="基本の休暇者（空欄可）"
+                        className="w-full p-2 border border-slate-300 rounded outline-none focus:border-indigo-500 text-sm"
+                      />
+                    </div>
+                    
+                    <div className="bg-slate-100 border-b border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 flex justify-between items-center">
+                      <span>各枠の担当者</span>
+                    </div>
+                    
+                    <div className="flex flex-col">
+                      {editingPatternData.slice(1).map((item, localIdx) => {
+                        const dataIdx = localIdx + 1;
+                        return (
+                          <div key={dataIdx} className="flex flex-col sm:flex-row items-stretch border-b border-slate-200 last:border-b-0 hover:bg-slate-50">
+                            <div className="sm:w-1/3 p-2 flex items-center bg-slate-50/50 sm:border-r border-slate-200">
+                              <input 
+                                type="text"
+                                value={item.role}
+                                onChange={(e) => handlePatternChange(dataIdx, 'role', e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded outline-none focus:border-indigo-500 text-sm font-bold"
+                                placeholder="枠名"
+                              />
+                            </div>
+                            <div className="sm:w-2/3 p-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                              <input 
+                                type="text"
+                                value={item.staff}
+                                onChange={(e) => handlePatternChange(dataIdx, 'staff', e.target.value)}
+                                className="w-full sm:flex-1 p-2 border border-slate-300 rounded outline-none focus:border-indigo-500 text-sm font-medium"
+                                placeholder="担当者"
+                              />
+                              <div className="flex items-center gap-3 shrink-0">
+                                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer hover:text-indigo-600 transition-colors">
+                                  <input 
+                                    type="checkbox"
+                                    checked={getPeriod(item) === 'PM'}
+                                    onChange={(e) => handlePatternChange(dataIdx, 'isPM', e.target.checked)}
+                                    className="w-3.5 h-3.5 accent-indigo-600 rounded cursor-pointer"
+                                  />
+                                  午後枠
+                                </label>
+                                <div className="flex flex-col gap-1 border-l border-slate-200 pl-3">
+                                  <button 
+                                    onClick={() => handlePatternMove(dataIdx, 'up')}
+                                    disabled={localIdx === 0}
+                                    className={`p-1 rounded transition-colors ${localIdx === 0 ? 'text-slate-200 cursor-not-allowed' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 bg-slate-50 border border-slate-200'}`}
+                                  >
+                                    <IconArrowUp className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => handlePatternMove(dataIdx, 'down')}
+                                    disabled={localIdx === editingPatternData.length - 2}
+                                    className={`p-1 rounded transition-colors ${localIdx === editingPatternData.length - 2 ? 'text-slate-200 cursor-not-allowed' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 bg-slate-50 border border-slate-200'}`}
+                                  >
+                                    <IconArrowDown className="w-4 h-4" />
+                                  </button>
+                                </div>
+                                <button 
+                                  onClick={() => {
+                                    const newData = [...editingPatternData];
+                                    newData.splice(dataIdx, 1);
+                                    setEditingPatternData(newData);
+                                  }}
+                                  className="text-slate-400 hover:text-red-500 p-2 ml-1"
+                                >
+                                  <IconTrash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    <div className="p-3 bg-slate-50">
+                      <button 
+                        onClick={() => setEditingPatternData([...editingPatternData, { role: '新規枠', staff: '' }])}
+                        className="w-full py-2 bg-white border border-dashed border-indigo-300 text-indigo-600 rounded flex items-center justify-center gap-2 hover:bg-indigo-50 transition-colors text-sm font-bold"
+                      >
+                        <IconPlus className="w-4 h-4" /> 枠を追加する
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 border-t border-slate-200 bg-white flex justify-between items-center shrink-0">
+                  <button 
+                    onClick={handleResetPattern}
+                    disabled={isSavingPattern}
+                    className="text-xs text-slate-500 hover:text-red-600 underline underline-offset-2"
+                  >
+                    この曜日を初期設定に戻す
+                  </button>
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => setShowPatternModal(false)}
+                      disabled={isSavingPattern}
+                      className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold text-sm transition-colors border border-slate-300"
+                    >
+                      キャンセル
+                    </button>
+                    <button 
+                      onClick={handleSavePattern}
+                      disabled={isSavingPattern}
+                      className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-bold text-sm transition-colors shadow-sm"
+                    >
+                      {isSavingPattern ? <IconLoader2 className="w-4 h-4" /> : <IconSave className="w-4 h-4" />}
+                      保存
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
