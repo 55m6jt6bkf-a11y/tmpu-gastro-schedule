@@ -656,7 +656,6 @@
 
     function App() {
       const [user, setUser] = useState(null);
-      // 基本パターンをFirestoreから読み込むためのステート
       const [customDefaultPatterns, setCustomDefaultPatterns] = useState({});
 
       const [schedules, setSchedules] = useState({});
@@ -681,20 +680,25 @@
       const [isSaving, setIsSaving] = useState(false);
       const [showLoginModal, setShowLoginModal] = useState(false);
       const [showHistoryModal, setShowHistoryModal] = useState(false);
-      
-      // 一括入力・アラート一覧用のステート
-      const [showBatchOnCallModal, setShowBatchOnCallModal] = useState(false);
-      const [batchOnCalls, setBatchOnCalls] = useState({});
-      const [isBatchSaving, setIsBatchSaving] = useState(false);
-      const [showAlertsModal, setShowAlertsModal] = useState(false);
-      const [allAlerts, setAllAlerts] = useState([]);
-
-      const [showStatsModal, setShowStatsModal] = useState(false);
-      const [statsTab, setStatsTab] = useState('new'); // 'new' または 'combined'
       const [password, setPassword] = useState('');
       const [loginError, setLoginError] = useState('');
 
-      // 基本パターン編集用のステート
+      const [showStickyNav, setShowStickyNav] = useState(true);
+      const [lastScrollY, setLastScrollY] = useState(0);
+
+      const [showUrgentAlertModal, setShowUrgentAlertModal] = useState(false);
+      const [urgentAlertData, setUrgentAlertData] = useState(null);
+      const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
+      const [saveNotifyTarget, setSaveNotifyTarget] = useState(null);
+      
+      const [showStatsModal, setShowStatsModal] = useState(false);
+      const [showAlertsModal, setShowAlertsModal] = useState(false);
+      const [allAlerts, setAllAlerts] = useState([]);
+
+      const [showBatchOnCallModal, setShowBatchOnCallModal] = useState(false);
+      const [batchOnCalls, setBatchOnCalls] = useState({});
+      const [isBatchSaving, setIsBatchSaving] = useState(false);
+
       const [showPatternModal, setShowPatternModal] = useState(false);
       const [patternMonth, setPatternMonth] = useState('');
       const [patternWeek, setPatternWeek] = useState(0);
@@ -702,127 +706,8 @@
       const [editingPatternData, setEditingPatternData] = useState([]);
       const [isSavingPattern, setIsSavingPattern] = useState(false);
       const [copySourceMonth, setCopySourceMonth] = useState('');
-
-      const [showStickyNav, setShowStickyNav] = useState(true);
-      const [lastScrollY, setLastScrollY] = useState(0);
       
       const todayStr = getTodayStr();
-
-      // Firebaseから基本パターンを購読
-      useEffect(() => {
-        if (!user) return;
-        const patternsRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'default_patterns');
-        const unsub = onSnapshot(patternsRef, (snapshot) => {
-          const patterns = {};
-          snapshot.forEach(doc => {
-            patterns[doc.id] = doc.data();
-          });
-          setCustomDefaultPatterns(patterns);
-        });
-        return () => unsub();
-      }, [user]);
-
-      // 現在のパターン（ハードコード＋カスタム）からデフォルトスケジュールを動的に生成
-      const defaultSchedules = React.useMemo(() => {
-        const result = {};
-        const splitDate = new Date('2026-10-01');
-
-        weeksData.forEach((week) => {
-          week.dates.forEach((dateStr) => {
-            const d = new Date(dateStr);
-            const weekIndex = getWeekOfMonthIndex(d);
-            const dayIndex = d.getDay() - 1;
-            
-            if (dayIndex >= 0 && dayIndex <= 4 && weekIndex >= 0 && weekIndex <= 4) {
-               const yyyyMm = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-               const customDoc = customDefaultPatterns[yyyyMm];
-               const customKey = `week${weekIndex}_day${dayIndex}`;
-               
-               // カスタムパターンが設定されていて、削除フラグ（"RESET"）でなければ適用
-               if (customDoc && customDoc[customKey] && customDoc[customKey] !== "RESET") {
-                 try {
-                   result[dateStr] = JSON.parse(customDoc[customKey]);
-                   return; // カスタムパターンを適用して次の日へ
-                 } catch(e) { console.error(e); }
-               }
-               
-               // カスタムパターンがなければ初期ハードコード値を適用
-               if (d < splitDate) {
-                 result[dateStr] = JSON.parse(JSON.stringify(monthlyPatternsUntilSep[weekIndex][dayIndex]));
-               } else {
-                 result[dateStr] = JSON.parse(JSON.stringify(monthlyPatternsFromOct[weekIndex][dayIndex]));
-               }
-            }
-          });
-        });
-        return result;
-      }, [customDefaultPatterns]);
-
-      const defaultHolidays = React.useMemo(() => {
-        const result = {};
-        weeksData.forEach(week => {
-          week.dates.forEach(d => { result[d] = PUBLIC_HOLIDAYS.includes(d); });
-        });
-        return result;
-      }, []);
-
-      const defaultOnCalls = React.useMemo(() => {
-        const result = {};
-        weeksData.forEach(week => {
-          week.dates.forEach(d => { result[d] = { first: '', second: '' }; });
-        });
-        return result;
-      }, []);
-
-      const defaultNotices = React.useMemo(() => {
-        const result = {};
-        weeksData.forEach(week => {
-          week.dates.forEach(d => { result[d] = ''; });
-        });
-        return result;
-      }, []);
-
-      useEffect(() => {
-        if (!user) return;
-        const schedulesRef = collection(db, 'artifacts', APP_ID, 'public', 'data', COLLECTION_NAME);
-        
-        const allDates = weeksData.flatMap(w => w.dates);
-        const unsubscribers = allDates.map(dateKey => {
-          const docRef = doc(schedulesRef, dateKey);
-          return onSnapshot(docRef, 
-            (snapshot) => {
-              if (snapshot.exists()) {
-                const data = snapshot.data();
-                const parsedStaffData = JSON.parse(data.staffData);
-                setSchedules(prev => ({ ...prev, [dateKey]: parsedStaffData }));
-                setHolidays(prev => ({ ...prev, [dateKey]: data.isHoliday !== undefined ? data.isHoliday : defaultHolidays[dateKey] }));
-                setOnCalls(prev => ({ ...prev, [dateKey]: data.onCallData || { first: '', second: '' } }));
-                setNotices(prev => ({ ...prev, [dateKey]: data.notice || '' }));
-                setSchedulesMetadata(prev => ({ 
-                  ...prev, 
-                  [dateKey]: { 
-                    updatedAt: data.updatedAt, 
-                    updatedBy: data.updatedBy,
-                    lastChanges: data.lastChanges || []
-                  } 
-                }));
-              } else {
-                setSchedules(prev => { const next = {...prev}; delete next[dateKey]; return next; });
-                setHolidays(prev => { const next = {...prev}; delete next[dateKey]; return next; });
-                setOnCalls(prev => { const next = {...prev}; delete next[dateKey]; return next; });
-                setNotices(prev => { const next = {...prev}; delete next[dateKey]; return next; });
-                setSchedulesMetadata(prev => { const next = {...prev}; delete next[dateKey]; return next; });
-              }
-              setIsLoading(false);
-            },
-            (error) => {
-              console.error(`Error fetching schedule for ${dateKey}:`, error);
-              setIsLoading(false);
-            }
-          );
-        });
-        return () => unsubscribers.forEach(unsub => unsub());
-      }, [user, defaultHolidays]);
 
       useEffect(() => {
         let initialDate = weeksData[0].dates[0];
@@ -873,6 +758,78 @@
       }, []);
 
       useEffect(() => {
+        if (!user) return;
+        const schedulesRef = collection(db, 'artifacts', APP_ID, 'public', 'data', COLLECTION_NAME);
+        
+        const allDates = weeksData.flatMap(w => w.dates);
+        const unsubscribers = allDates.map(dateKey => {
+          const docRef = doc(schedulesRef, dateKey);
+          return onSnapshot(docRef, 
+            (snapshot) => {
+              if (snapshot.exists()) {
+                const data = snapshot.data();
+                const parsedStaffData = JSON.parse(data.staffData);
+                setSchedules(prev => ({ ...prev, [dateKey]: parsedStaffData }));
+                setHolidays(prev => ({ ...prev, [dateKey]: data.isHoliday !== undefined ? data.isHoliday : defaultHolidays[dateKey] }));
+                setOnCalls(prev => ({ ...prev, [dateKey]: data.onCallData || { first: '', second: '' } }));
+                setNotices(prev => ({ ...prev, [dateKey]: data.notice || '' }));
+                setSchedulesMetadata(prev => ({ 
+                  ...prev, 
+                  [dateKey]: { 
+                    updatedAt: data.updatedAt, 
+                    updatedBy: data.updatedBy,
+                    lastChanges: data.lastChanges || [],
+                    urgentNotice: data.urgentNotice || false
+                  } 
+                }));
+              } else {
+                setSchedules(prev => {
+                  const newObj = { ...prev };
+                  delete newObj[dateKey];
+                  return newObj;
+                });
+                setHolidays(prev => {
+                  const newObj = { ...prev };
+                  delete newObj[dateKey];
+                  return newObj;
+                });
+                setOnCalls(prev => {
+                  const newObj = { ...prev };
+                  delete newObj[dateKey];
+                  return newObj;
+                });
+                setNotices(prev => {
+                  const newObj = { ...prev };
+                  delete newObj[dateKey];
+                  return newObj;
+                });
+                setSchedulesMetadata(prev => ({ ...prev, [dateKey]: null }));
+              }
+              setIsLoading(false);
+            },
+            (error) => {
+              console.error(`Error fetching schedule for ${dateKey}:`, error);
+              setIsLoading(false);
+            }
+          );
+        });
+
+        const patternsRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'default_patterns');
+        const patternUnsub = onSnapshot(patternsRef, (snapshot) => {
+          const patterns = {};
+          snapshot.forEach(doc => {
+            patterns[doc.id] = doc.data();
+          });
+          setCustomDefaultPatterns(patterns);
+        });
+        
+        return () => {
+          unsubscribers.forEach(unsub => unsub());
+          patternUnsub();
+        };
+      }, [user]);
+
+      useEffect(() => {
         const handleScroll = () => {
           const currentScrollY = window.scrollY;
           
@@ -890,6 +847,69 @@
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
       }, [lastScrollY]);
+
+      useEffect(() => {
+        if (isLoading) return;
+        
+        const now = new Date();
+        
+        const checkAndShowAlert = (dateStr) => {
+          const meta = schedulesMetadata[dateStr];
+          if (meta && meta.updatedAt && meta.urgentNotice) {
+            const updatedAt = new Date(meta.updatedAt);
+            
+            // ハイフン区切りをスラッシュ区切りに変換（Safari互換性のため）
+            const targetDateObj = new Date(dateStr.replace(/-/g, '/'));
+            targetDateObj.setHours(0, 0, 0, 0);
+
+            // 前日12:00
+            const periodStart = new Date(targetDateObj);
+            periodStart.setDate(periodStart.getDate() - 1);
+            periodStart.setHours(12, 0, 0, 0);
+
+            // 当日12:00（変更対象期間の終了）
+            const updatePeriodEnd = new Date(targetDateObj);
+            updatePeriodEnd.setHours(12, 0, 0, 0);
+
+            // 当日15:00（表示期間の終了）
+            const displayPeriodEnd = new Date(targetDateObj);
+            displayPeriodEnd.setHours(15, 0, 0, 0);
+
+            // 変更日時が「前日12:00〜当日12:00」の間か判定
+            if (updatedAt >= periodStart && updatedAt <= updatePeriodEnd) {
+              // 現在時刻が表示期間内（前日12:00〜当日15:00）か判定
+              if (now >= periodStart && now <= displayPeriodEnd) {
+                const alertKey = `urgent_alert_${dateStr}_${updatedAt.getTime()}`;
+                // タブのセッション中1回だけ表示する
+                if (!sessionStorage.getItem(alertKey)) {
+                  setUrgentAlertData({
+                    date: dateStr,
+                    updatedAt: updatedAt,
+                    changes: meta.lastChanges || []
+                  });
+                  setShowUrgentAlertModal(true);
+                  sessionStorage.setItem(alertKey, 'true');
+                  return true;
+                }
+              }
+            }
+          }
+          return false;
+        };
+
+        const todayObj = new Date();
+        const tomorrowObj = new Date(todayObj);
+        tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+        
+        const todayStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
+        const tomorrowStr = `${tomorrowObj.getFullYear()}-${String(tomorrowObj.getMonth() + 1).padStart(2, '0')}-${String(tomorrowObj.getDate()).padStart(2, '0')}`;
+
+        // まず今日の分をチェックし、表示されなければ明日の分をチェック
+        if (!checkAndShowAlert(todayStr)) {
+          checkAndShowAlert(tomorrowStr);
+        }
+
+      }, [schedulesMetadata, isLoading]);
 
       const handleMonthChange = (month) => {
         setSelectedMonth(month);
@@ -970,7 +990,28 @@
         }));
       };
 
-      const handleSave = async () => {
+      const handleSaveClick = () => {
+        const changedDates = new Set([...Object.keys(pendingChanges), ...Object.keys(pendingHolidays), ...Object.keys(pendingOnCalls), ...Object.keys(pendingNotices)]);
+        
+        const now = new Date();
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+        
+        // 12:00より前なら「今日」の変更が通知対象、12:00以降なら「明日」の変更が通知対象
+        const targetDateStr = now.getHours() < 12 ? todayStr : tomorrowStr;
+
+        if (changedDates.has(targetDateStr)) {
+          setSaveNotifyTarget(targetDateStr);
+          setShowSaveConfirmModal(true);
+        } else {
+          executeSave(false, null);
+        }
+      };
+
+      const executeSave = async (shouldNotify, targetDateStr) => {
         if (!user) return;
         setIsSaving(true);
         try {
@@ -1038,7 +1079,7 @@
               changes.push('枠の順序などを変更しました');
             }
 
-            return setDoc(docRef, {
+            const docData = {
               staffData: JSON.stringify(newStaffData),
               isHoliday: newHol,
               onCallData: newOnCall,
@@ -1046,7 +1087,15 @@
               lastChanges: changes,
               updatedAt: new Date().toISOString(),
               updatedBy: user.uid
-            }, { merge: true });
+            };
+
+            if (dateKey === targetDateStr) {
+               docData.urgentNotice = shouldNotify;
+            } else {
+               docData.urgentNotice = false;
+            }
+
+            return setDoc(docRef, docData, { merge: true });
           });
           
           await Promise.all(promises);
@@ -1060,6 +1109,7 @@
           alert("保存に失敗しました。");
         } finally {
           setIsSaving(false);
+          setSaveNotifyTarget(null);
         }
       };
 
@@ -2811,7 +2861,7 @@
                       キャンセル
                     </button>
                     <button
-                      onClick={handleSave}
+                      onClick={handleSaveClick}
                       disabled={isSaving}
                       className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 sm:py-2 rounded-md text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors disabled:opacity-50"
                     >
@@ -2823,6 +2873,44 @@
               </div>
             )}
           </main>
+
+          {/* 保存時の通知確認モーダル */}
+          {showSaveConfirmModal && (
+            <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm print:hidden">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="p-5">
+                  <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <IconMegaphone className="w-5 h-5 text-blue-600" />
+                    ポップアップ通知の確認
+                  </h3>
+                  <p className="text-sm text-slate-600 mb-4 font-medium leading-relaxed">
+                    直近の出番（{saveNotifyTarget.replace(/-/g, '/')}）に変更が含まれています。<br/>
+                    閲覧ユーザーに向けて、急遽の変更としてポップアップ通知を表示しますか？
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <button 
+                      onClick={() => { setShowSaveConfirmModal(false); executeSave(true, saveNotifyTarget); }}
+                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-md shadow-sm transition-colors text-sm"
+                    >
+                      通知して保存する
+                    </button>
+                    <button 
+                      onClick={() => { setShowSaveConfirmModal(false); executeSave(false, saveNotifyTarget); }}
+                      className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-md transition-colors text-sm border border-slate-300"
+                    >
+                      通知せずに保存する
+                    </button>
+                    <button 
+                      onClick={() => setShowSaveConfirmModal(false)}
+                      className="w-full py-2 text-slate-500 hover:text-slate-700 font-medium text-sm mt-1"
+                    >
+                      キャンセル
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 新患・当番担当集計モーダル */}
           {showStatsModal && (
@@ -3029,416 +3117,344 @@
             </div>
           )}
 
-          {/* 基本担当パターン設定モーダル */}
+          {/* 急な変更のアラートモーダル */}
+          {showUrgentAlertModal && urgentAlertData && (
+            <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-[60] backdrop-blur-sm print:hidden">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border-2 border-red-400">
+                <div className="bg-red-50 p-4 border-b border-red-200 flex items-center gap-3">
+                  <div className="bg-red-100 p-2 rounded-full text-red-600">
+                    <IconAlertTriangle className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-red-800 text-lg leading-tight">急遽の出番変更のお知らせ</h3>
+                    <p className="text-red-600 text-xs font-bold mt-0.5">
+                      {urgentAlertData.date.split('-')[1]}/{urgentAlertData.date.split('-')[2]} {getDayName(urgentAlertData.date)} の出番に変更がありました
+                    </p>
+                  </div>
+                </div>
+                <div className="p-5 bg-white max-h-[50vh] overflow-y-auto">
+                  <p className="text-sm text-slate-700 font-bold mb-3 border-b border-slate-100 pb-2 flex items-center gap-1.5">
+                    <IconClock className="w-4 h-4 text-slate-400" />
+                    変更日時: {urgentAlertData.updatedAt.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  {urgentAlertData.changes.length > 0 ? (
+                    <ul className="text-sm text-slate-800 space-y-2 list-disc pl-5 font-medium">
+                      {urgentAlertData.changes.map((change, i) => (
+                        <li key={i} className="leading-snug">{change}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-slate-600">（具体的な変更内容は履歴から確認できます）</p>
+                  )}
+                </div>
+                <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
+                  <button 
+                    onClick={() => setShowUrgentAlertModal(false)}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold text-sm transition-colors border border-slate-300"
+                  >
+                    閉じる
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setShowUrgentAlertModal(false);
+                      const month = parseInt(urgentAlertData.date.split('-')[1], 10);
+                      const week = weeksData.find(w => w.dates.includes(urgentAlertData.date));
+                      if (week) {
+                        setSelectedMonth(month);
+                        setSelectedWeek(week.id);
+                        setSelectedDate(urgentAlertData.date);
+                        setViewMode('day');
+                      }
+                    }}
+                    className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-md font-bold text-sm transition-colors shadow-sm"
+                  >
+                    該当日を確認する
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 基本出番表設定モーダル */}
           {showPatternModal && (
             <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm print:hidden">
-              <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-indigo-50 shrink-0">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-indigo-50">
                   <h3 className="font-bold text-base flex items-center gap-1.5 text-indigo-800">
                     <IconTable className="w-5 h-5" />
-                    基本出番表設定
+                    基本出番表（デフォルト）設定
                   </h3>
-                  <button 
-                    onClick={() => setShowPatternModal(false)}
-                    disabled={isSavingPattern}
-                    className="p-1 hover:bg-indigo-200 rounded text-indigo-600 transition-colors disabled:opacity-50"
-                  >
+                  <button onClick={() => setShowPatternModal(false)} className="p-1 hover:bg-indigo-200 rounded text-indigo-600 transition-colors">
                     <IconX className="w-5 h-5" />
                   </button>
                 </div>
                 
-                <div className="p-4 bg-slate-100 border-b border-slate-200 shrink-0 flex flex-col sm:flex-row justify-between gap-4 items-start sm:items-center">
-                  <div className="flex flex-wrap gap-3 items-center">
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-bold text-slate-600">対象月</label>
-                      <select 
-                        value={patternMonth} 
-                        onChange={(e) => setPatternMonth(e.target.value)}
-                        className="border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-indigo-500 font-bold text-sm bg-white"
-                      >
-                        {patternMonthOptions.map(opt => (
-                          <option key={opt} value={opt}>{opt.split('-')[0]}年{opt.split('-')[1]}月</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-bold text-slate-600">週</label>
-                      <select 
-                        value={patternWeek} 
-                        onChange={(e) => setPatternWeek(Number(e.target.value))}
-                        className="border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-indigo-500 font-bold text-sm bg-white"
-                      >
-                        <option value={0}>第1週</option>
-                        <option value={1}>第2週</option>
-                        <option value={2}>第3週</option>
-                        <option value={3}>第4週</option>
-                        <option value={4}>第5週</option>
-                      </select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-bold text-slate-600">曜日</label>
-                      <select 
-                        value={patternDay} 
-                        onChange={(e) => setPatternDay(Number(e.target.value))}
-                        className="border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-indigo-500 font-bold text-sm bg-white"
-                      >
-                        <option value={0}>月曜日</option>
-                        <option value={1}>火曜日</option>
-                        <option value={2}>水曜日</option>
-                        <option value={3}>木曜日</option>
-                        <option value={4}>金曜日</option>
-                      </select>
-                    </div>
+                <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap gap-4 items-center">
+                  <div className="flex gap-2 items-center">
+                    <select value={patternMonth} onChange={(e) => setPatternMonth(e.target.value)} className="p-2 rounded border border-slate-300 font-bold text-sm bg-white outline-none focus:border-indigo-500">
+                      {patternMonthOptions.map(m => <option key={m} value={m}>{m.split('-')[0]}年{m.split('-')[1]}月</option>)}
+                    </select>
+                    <span className="text-slate-500">の</span>
                   </div>
                   
-                  <div className="flex items-center gap-2 bg-indigo-50 px-3 py-1.5 rounded border border-indigo-200 w-full sm:w-auto shrink-0 shadow-sm">
-                    <span className="text-xs font-bold text-indigo-800 whitespace-nowrap">月一括コピー</span>
-                    <select 
-                      value={copySourceMonth} 
-                      onChange={(e) => setCopySourceMonth(e.target.value)}
-                      className="border border-indigo-300 rounded px-2 py-1 outline-none focus:border-indigo-500 font-bold text-xs bg-white flex-1 sm:flex-none text-indigo-900"
-                    >
-                      <option value="">他の月を選択</option>
-                      {patternMonthOptions.map(opt => (
-                        <option key={opt} value={opt} disabled={opt === patternMonth}>{opt.split('-')[0]}年{opt.split('-')[1]}月</option>
+                  <div className="flex gap-2 items-center">
+                    <select value={patternWeek} onChange={(e) => setPatternWeek(Number(e.target.value))} className="p-2 rounded border border-slate-300 font-bold text-sm bg-white outline-none focus:border-indigo-500">
+                      {['第1週', '第2週', '第3週', '第4週', '第5週'].map((w, i) => <option key={i} value={i}>{w}</option>)}
+                    </select>
+                    <select value={patternDay} onChange={(e) => setPatternDay(Number(e.target.value))} className="p-2 rounded border border-slate-300 font-bold text-sm bg-white outline-none focus:border-indigo-500">
+                      {['月曜日', '火曜日', '水曜日', '木曜日', '金曜日'].map((d, i) => <option key={i} value={i}>{d}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white border-b border-slate-200 flex gap-2 items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-700 whitespace-nowrap">一括コピー:</span>
+                    <select value={copySourceMonth} onChange={(e) => setCopySourceMonth(e.target.value)} className="p-1.5 rounded border border-slate-300 text-xs bg-slate-50">
+                      <option value="">コピー元を選択</option>
+                      {patternMonthOptions.filter(m => m !== patternMonth).map(m => (
+                        <option key={m} value={m}>{m.split('-')[0]}年{m.split('-')[1]}月 の設定</option>
                       ))}
                     </select>
-                    <button 
-                      onClick={handleCopyMonth}
-                      disabled={!copySourceMonth || isSavingPattern}
-                      className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-bold transition-colors disabled:opacity-50 shrink-0"
-                    >
-                      コピー
+                    <button onClick={handleCopyMonth} disabled={!copySourceMonth || isSavingPattern} className="px-3 py-1.5 bg-indigo-100 text-indigo-700 border border-indigo-300 rounded font-bold text-xs hover:bg-indigo-200 disabled:opacity-50 transition-colors whitespace-nowrap">
+                      適用
                     </button>
                   </div>
+                  <button onClick={handleResetPattern} disabled={isSavingPattern} className="px-3 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded transition-colors whitespace-nowrap">
+                    初期値に戻す
+                  </button>
                 </div>
 
-                <div className="p-4 overflow-y-auto bg-slate-50 flex-1">
-                  <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                    <div className="bg-indigo-50 border-b border-indigo-200 px-4 py-2 text-sm font-bold text-indigo-800">
-                      休暇者
-                    </div>
-                    <div className="p-3 bg-white border-b border-slate-200">
-                      <input
-                        type="text"
-                        value={editingPatternData[0]?.staff || ''}
-                        onChange={(e) => handlePatternChange(0, 'staff', e.target.value)}
-                        placeholder="基本の休暇者（空欄可）"
-                        className="w-full p-2 border border-slate-300 rounded outline-none focus:border-indigo-500 text-sm"
-                      />
-                    </div>
-                    
-                    <div className="bg-slate-100 border-b border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 flex justify-between items-center">
-                      <span>各枠の担当者</span>
-                    </div>
-                    
-                    <div className="flex flex-col">
-                      {editingPatternData.slice(1).map((item, localIdx) => {
-                        const dataIdx = localIdx + 1;
-                        return (
-                          <div key={dataIdx} className="flex flex-col sm:flex-row items-stretch border-b border-slate-200 last:border-b-0 hover:bg-slate-50">
-                            <div className="sm:w-1/3 p-2 flex items-center bg-slate-50/50 sm:border-r border-slate-200">
-                              <input 
+                <div className="p-4 overflow-y-auto bg-slate-100 flex-1">
+                  <div className="flex flex-col border border-slate-300 rounded-lg overflow-hidden bg-white">
+                    {editingPatternData.map((item, index) => (
+                      <div key={index} className="flex flex-col sm:flex-row border-b border-slate-200 last:border-b-0 hover:bg-slate-50 p-2 gap-2 sm:gap-4 items-center">
+                        {index === 0 ? (
+                          <>
+                            <div className="sm:w-1/3 w-full shrink-0">
+                              <span className="inline-block px-2 py-1 rounded text-xs font-bold border bg-rose-100 text-rose-800 border-rose-300">
+                                {item.role}
+                              </span>
+                            </div>
+                            <input
+                              type="text"
+                              value={item.staff}
+                              onChange={(e) => handlePatternChange(index, 'staff', e.target.value)}
+                              className="flex-1 w-full p-2 border rounded outline-none focus:border-indigo-400 text-sm"
+                              placeholder="休暇者を入力"
+                            />
+                            <div className="w-16 hidden sm:block"></div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="sm:w-1/3 w-full shrink-0 flex items-center gap-2">
+                              <input
                                 type="text"
                                 value={item.role}
-                                onChange={(e) => handlePatternChange(dataIdx, 'role', e.target.value)}
-                                className="w-full p-2 border border-slate-300 rounded outline-none focus:border-indigo-500 text-sm font-bold"
-                                placeholder="枠名"
+                                onChange={(e) => handlePatternChange(index, 'role', e.target.value)}
+                                className="w-full p-1.5 border rounded outline-none focus:border-indigo-400 text-sm font-bold bg-slate-50"
                               />
                             </div>
-                            <div className="sm:w-2/3 p-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                              <input 
+                            <div className="flex-1 w-full flex flex-col gap-1">
+                              <input
                                 type="text"
                                 value={item.staff}
-                                onChange={(e) => handlePatternChange(dataIdx, 'staff', e.target.value)}
-                                className="w-full sm:flex-1 p-2 border border-slate-300 rounded outline-none focus:border-indigo-500 text-sm font-medium"
-                                placeholder="担当者"
+                                onChange={(e) => handlePatternChange(index, 'staff', e.target.value)}
+                                className="w-full p-2 border rounded outline-none focus:border-indigo-400 text-sm"
+                                placeholder="担当者を入力"
                               />
-                              <div className="flex items-center gap-3 shrink-0">
-                                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer hover:text-indigo-600 transition-colors">
-                                  <input 
-                                    type="checkbox"
-                                    checked={getPeriod(item) === 'PM'}
-                                    onChange={(e) => handlePatternChange(dataIdx, 'isPM', e.target.checked)}
-                                    className="w-3.5 h-3.5 accent-indigo-600 rounded cursor-pointer"
-                                  />
-                                  午後枠
-                                </label>
-                                <div className="flex flex-col gap-1 border-l border-slate-200 pl-3">
-                                  <button 
-                                    onClick={() => handlePatternMove(dataIdx, 'up')}
-                                    disabled={localIdx === 0}
-                                    className={`p-1 rounded transition-colors ${localIdx === 0 ? 'text-slate-200 cursor-not-allowed' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 bg-slate-50 border border-slate-200'}`}
-                                  >
-                                    <IconArrowUp className="w-4 h-4" />
-                                  </button>
-                                  <button 
-                                    onClick={() => handlePatternMove(dataIdx, 'down')}
-                                    disabled={localIdx === editingPatternData.length - 2}
-                                    className={`p-1 rounded transition-colors ${localIdx === editingPatternData.length - 2 ? 'text-slate-200 cursor-not-allowed' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 bg-slate-50 border border-slate-200'}`}
-                                  >
-                                    <IconArrowDown className="w-4 h-4" />
-                                  </button>
-                                </div>
-                                <button 
-                                  onClick={() => {
-                                    const newData = [...editingPatternData];
-                                    newData.splice(dataIdx, 1);
-                                    setEditingPatternData(newData);
-                                  }}
-                                  className="text-slate-400 hover:text-red-500 p-2 ml-1"
-                                >
-                                  <IconTrash2 className="w-4 h-4" />
-                                </button>
-                              </div>
+                              <label className="flex items-center gap-1 text-[10px] text-slate-500 font-bold cursor-pointer w-fit pl-1 hover:text-indigo-600">
+                                <input
+                                  type="checkbox"
+                                  checked={getPeriod(item) === 'PM'}
+                                  onChange={(e) => handlePatternChange(index, 'isPM', e.target.checked)}
+                                  className="rounded border-slate-300 w-3 h-3 cursor-pointer"
+                                />
+                                午後枠として扱う
+                              </label>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    
-                    <div className="p-3 bg-slate-50">
-                      <button 
-                        onClick={() => setEditingPatternData([...editingPatternData, { role: '新規枠', staff: '' }])}
-                        className="w-full py-2 bg-white border border-dashed border-indigo-300 text-indigo-600 rounded flex items-center justify-center gap-2 hover:bg-indigo-50 transition-colors text-sm font-bold"
-                      >
-                        <IconPlus className="w-4 h-4" /> 枠を追加する
-                      </button>
-                    </div>
+                            <div className="flex gap-1 shrink-0 ml-auto">
+                              <button onClick={() => handlePatternMove(index, 'up')} disabled={index === 1} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded border border-slate-200 bg-white disabled:opacity-30">
+                                <IconArrowUp className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => handlePatternMove(index, 'down')} disabled={index === editingPatternData.length - 1} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded border border-slate-200 bg-white disabled:opacity-30">
+                                <IconArrowDown className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => {
+                                const newData = [...editingPatternData];
+                                newData.splice(index, 1);
+                                setEditingPatternData(newData);
+                              }} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded border border-slate-200 bg-white ml-2">
+                                <IconTrash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                </div>
-
-                <div className="p-4 border-t border-slate-200 bg-white flex justify-between items-center shrink-0">
-                  <button 
-                    onClick={handleResetPattern}
-                    disabled={isSavingPattern}
-                    className="text-xs text-slate-500 hover:text-red-600 underline underline-offset-2"
-                  >
-                    この曜日を初期設定に戻す
+                  <button onClick={() => setEditingPatternData([...editingPatternData, {role: '臨時枠', staff: ''}])} className="mt-3 w-full py-2 border-2 border-dashed border-indigo-300 text-indigo-600 rounded flex items-center justify-center gap-1 font-bold text-sm hover:bg-indigo-50 transition-colors">
+                    <IconPlus className="w-4 h-4" /> 枠を追加
                   </button>
-                  <div className="flex gap-3">
-                    <button 
-                      onClick={() => setShowPatternModal(false)}
-                      disabled={isSavingPattern}
-                      className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold text-sm transition-colors border border-slate-300"
-                    >
-                      キャンセル
-                    </button>
-                    <button 
-                      onClick={handleSavePattern}
-                      disabled={isSavingPattern}
-                      className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-bold text-sm transition-colors shadow-sm"
-                    >
-                      {isSavingPattern ? <IconLoader2 className="w-4 h-4" /> : <IconSave className="w-4 h-4" />}
-                      保存
-                    </button>
-                  </div>
+                </div>
+                
+                <div className="p-4 border-t border-slate-200 bg-white flex justify-end gap-3">
+                  <button onClick={() => setShowPatternModal(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold text-sm transition-colors border border-slate-300">
+                    キャンセル
+                  </button>
+                  <button onClick={handleSavePattern} disabled={isSavingPattern} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold text-sm transition-colors shadow-sm flex items-center gap-1.5">
+                    {isSavingPattern ? <IconLoader2 className="w-4 h-4" /> : <IconSave className="w-4 h-4" />}
+                    保存して適用
+                  </button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* 当番一括入力モーダル */}
+          {/* 日中当番一括入力モーダル */}
           {showBatchOnCallModal && (
             <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm print:hidden">
-              <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-indigo-50 shrink-0">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-indigo-50">
                   <h3 className="font-bold text-base flex items-center gap-1.5 text-indigo-800">
                     <IconClock className="w-5 h-5" />
-                    {selectedMonth}月の日中当番一括入力
+                    日中当番一括入力 ({selectedMonth}月)
                   </h3>
-                  <button 
-                    onClick={() => setShowBatchOnCallModal(false)}
-                    disabled={isBatchSaving}
-                    className="p-1 hover:bg-indigo-200 rounded text-indigo-600 transition-colors disabled:opacity-50"
-                  >
+                  <button onClick={() => setShowBatchOnCallModal(false)} className="p-1 hover:bg-indigo-200 rounded text-indigo-600 transition-colors">
                     <IconX className="w-5 h-5" />
                   </button>
                 </div>
+                
+                <div className="p-4 bg-indigo-50/50 border-b border-slate-200 flex flex-wrap gap-4 items-center justify-between">
+                  <p className="text-sm text-slate-600 font-bold flex items-center gap-1">
+                    <IconAlertCircle className="w-4 h-4 text-indigo-500" />
+                    Excelから貼り付けるか、直接入力してください。
+                  </p>
+                  <label className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-indigo-200 hover:border-indigo-400 rounded-md cursor-pointer text-sm font-bold text-indigo-700 transition-colors shadow-sm">
+                    <IconUpload className="w-4 h-4" />
+                    Excelファイルを読み込む
+                    <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleFileUpload} />
+                  </label>
+                </div>
 
-                <div className="p-4 bg-white border-b border-slate-200 shrink-0">
-                  <div className="bg-indigo-50/50 border border-indigo-200 rounded-lg p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div>
-                      <h4 className="font-bold text-indigo-800 text-sm flex items-center gap-1.5">
-                        <IconUpload className="w-4 h-4 text-indigo-600" /> Excelから自動読込
-                      </h4>
-                      <p className="text-xs text-indigo-600 mt-1 leading-relaxed">
-                        カレンダー形式の当番表(.xlsx)から読み込みます。<br/>
-                        （日付セルの1段下が1st Call、2段下が2nd Callとして抽出され、2ndのカッコは自動で外れます）
-                      </p>
-                    </div>
-                    <label className={`shrink-0 cursor-pointer border px-4 py-2 rounded text-sm font-bold transition-colors shadow-sm ${isBatchSaving ? 'bg-slate-100 border-slate-300 text-slate-400' : 'bg-white border-indigo-300 hover:bg-indigo-100 text-indigo-700'}`}>
-                      {isBatchSaving ? '読込中...' : 'ファイルを選択'}
-                      <input 
-                        type="file" 
-                        accept=".xlsx"
-                        className="hidden"
-                        onChange={handleFileUpload}
-                        disabled={isBatchSaving}
-                      />
-                    </label>
+                <div className="p-4 overflow-y-auto bg-slate-100 flex-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {Object.keys(batchOnCalls).sort().map(d => {
+                      const dayStr = `${d.split('-')[1]}/${d.split('-')[2]}(${['日','月','火','水','木','金','土'][new Date(d).getDay()]})`;
+                      const isHol = holidays[d] || defaultHolidays[d];
+                      const daySchedules = schedules[d] || defaultSchedules[d] || [];
+                      const pLeaves = parseLeaveNames(daySchedules[0]?.staff);
+                      const bData = daySchedules.slice(1);
+                      const oc1Error = checkOnCallConflicts(batchOnCalls[d].first, bData, pLeaves, false);
+                      const oc2Error = checkOnCallConflicts(batchOnCalls[d].second, bData, pLeaves, true);
+                      
+                      return (
+                        <div key={d} className={`bg-white p-3 rounded-lg border shadow-sm ${isHol ? 'border-rose-200 opacity-60' : 'border-slate-300'}`}>
+                          <div className={`text-sm font-bold mb-2 ${isHol ? 'text-rose-600' : 'text-slate-700'}`}>{dayStr} {isHol && <span className="text-[10px] bg-rose-100 px-1 rounded ml-1">休診日</span>}</div>
+                          <div className="flex flex-col gap-2">
+                            <div>
+                              <div className="flex gap-2 items-center">
+                                <span className="text-xs font-bold text-pink-700 bg-pink-100 px-1.5 py-0.5 rounded w-14 text-center">1st</span>
+                                <input type="text" value={batchOnCalls[d].first} onChange={(e) => handleBatchOnCallChange(d, 'first', e.target.value)} disabled={isHol} className="flex-1 border border-slate-300 rounded p-1.5 text-sm font-bold outline-none focus:border-indigo-500 disabled:bg-slate-50" placeholder="1st Call"/>
+                              </div>
+                              {!isHol && oc1Error && <div className="text-[10px] text-red-600 font-bold ml-16 mt-0.5">{oc1Error}</div>}
+                            </div>
+                            <div>
+                              <div className="flex gap-2 items-center">
+                                <span className="text-xs font-bold text-sky-700 bg-sky-100 px-1.5 py-0.5 rounded w-14 text-center">2nd</span>
+                                <input type="text" value={batchOnCalls[d].second} onChange={(e) => handleBatchOnCallChange(d, 'second', e.target.value)} disabled={isHol} className="flex-1 border border-slate-300 rounded p-1.5 text-sm font-bold outline-none focus:border-indigo-500 disabled:bg-slate-50" placeholder="2nd Call"/>
+                              </div>
+                              {!isHol && oc2Error && <div className="text-[10px] text-red-600 font-bold ml-16 mt-0.5">{oc2Error}</div>}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
                 
-                <div className="p-4 overflow-y-auto bg-slate-50 flex-1">
-                  <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-                    <table className="w-full text-sm text-left">
-                      <thead className="bg-slate-100 border-b border-slate-200 text-slate-600">
-                        <tr>
-                          <th className="p-2 font-bold w-32">日付</th>
-                          <th className="p-2 font-bold w-1/3">1st Call</th>
-                          <th className="p-2 font-bold w-1/3">2nd Call</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {Object.keys(batchOnCalls).map(d => {
-                          const isHol = pendingHolidays[d] !== undefined ? pendingHolidays[d] : holidays[d];
-                          const daySchedules = schedules[d] || defaultSchedules[d];
-                          const leavesData = daySchedules[0] || { staff: '' };
-                          const pLeaves = parseLeaveNames(leavesData.staff);
-                          const boothsData = daySchedules.slice(1);
-                          
-                          const oc1Err = checkOnCallConflicts(batchOnCalls[d].first, boothsData, pLeaves, false);
-                          const oc2Err = checkOnCallConflicts(batchOnCalls[d].second, boothsData, pLeaves, true);
-
-                          return (
-                            <tr key={d} className={isHol ? 'bg-rose-50/50' : 'hover:bg-slate-50 transition-colors'}>
-                              <td className="p-2 border-r border-slate-100 font-bold text-slate-700 align-top pt-3">
-                                {d.split('-')[1]}/{d.split('-')[2]} {getDayName(d)}
-                                {isHol && <span className="ml-1 text-[10px] text-rose-500 font-normal">休</span>}
-                              </td>
-                              <td className="p-2 border-r border-slate-100 align-top">
-                                <input 
-                                  type="text" 
-                                  value={batchOnCalls[d].first}
-                                  onChange={(e) => handleBatchOnCallChange(d, 'first', e.target.value)}
-                                  disabled={isHol || isBatchSaving}
-                                  placeholder="未設定"
-                                  className={`w-full p-2 border-2 rounded outline-none transition-colors text-sm font-medium disabled:opacity-50 ${oc1Err ? 'border-red-300 bg-red-50 focus:border-red-400' : 'border-slate-200 focus:border-indigo-400'}`}
-                                />
-                                {oc1Err && (
-                                  <div className="text-[10px] text-red-600 font-bold mt-1 flex items-start gap-1">
-                                    <IconAlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
-                                    <span>{oc1Err}</span>
-                                  </div>
-                                )}
-                              </td>
-                              <td className="p-2 align-top">
-                                <input 
-                                  type="text" 
-                                  value={batchOnCalls[d].second}
-                                  onChange={(e) => handleBatchOnCallChange(d, 'second', e.target.value)}
-                                  disabled={isHol || isBatchSaving}
-                                  placeholder="未設定"
-                                  className={`w-full p-2 border-2 rounded outline-none transition-colors text-sm font-medium disabled:opacity-50 ${oc2Err ? 'border-red-300 bg-red-50 focus:border-red-400' : 'border-slate-200 focus:border-indigo-400'}`}
-                                />
-                                {oc2Err && (
-                                  <div className="text-[10px] text-red-600 font-bold mt-1 flex items-start gap-1">
-                                    <IconAlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
-                                    <span>{oc2Err}</span>
-                                  </div>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
                 <div className="p-4 border-t border-slate-200 bg-white flex justify-end gap-3">
-                  <button 
-                    onClick={() => setShowBatchOnCallModal(false)}
-                    disabled={isBatchSaving}
-                    className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold text-sm transition-colors border border-slate-300 disabled:opacity-50"
-                  >
+                  <button onClick={() => setShowBatchOnCallModal(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold text-sm transition-colors border border-slate-300">
                     キャンセル
                   </button>
-                  <button 
-                    onClick={handleSaveBatchOnCalls}
-                    disabled={isBatchSaving}
-                    className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-bold text-sm transition-colors shadow-sm disabled:opacity-50"
-                  >
+                  <button onClick={handleSaveBatchOnCalls} disabled={isBatchSaving} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold text-sm transition-colors shadow-sm flex items-center gap-1.5">
                     {isBatchSaving ? <IconLoader2 className="w-4 h-4" /> : <IconSave className="w-4 h-4" />}
-                    {isBatchSaving ? '保存中...' : '一括保存'}
+                    一括保存
                   </button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* 未処理のアラート一覧モーダル */}
+          {/* アラート一覧モーダル */}
           {showAlertsModal && (
             <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm print:hidden">
-              <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-red-50">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center p-4 border-b border-red-200 bg-red-50">
                   <h3 className="font-bold text-base flex items-center gap-1.5 text-red-800">
                     <IconAlertCircle className="w-5 h-5" />
                     未処理のアラート一覧（本日以降）
                   </h3>
-                  <button 
-                    onClick={() => setShowAlertsModal(false)}
-                    className="p-1 hover:bg-red-200 rounded text-red-600 transition-colors"
-                  >
+                  <button onClick={() => setShowAlertsModal(false)} className="p-1 hover:bg-red-200 rounded text-red-600 transition-colors">
                     <IconX className="w-5 h-5" />
                   </button>
                 </div>
                 
                 <div className="p-4 overflow-y-auto bg-slate-50 flex-1">
                   {allAlerts.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-emerald-600">
-                      <IconSparkles className="w-12 h-12 mb-3 opacity-50" />
-                      <p className="font-bold text-lg">未処理のアラートはありません 🎉</p>
-                      <p className="text-sm mt-1 opacity-80">全てのスケジュールが正常に登録されています。</p>
+                    <div className="text-center py-10 flex flex-col items-center gap-3">
+                      <div className="bg-emerald-100 p-3 rounded-full text-emerald-600">
+                        <IconSparkles className="w-8 h-8" />
+                      </div>
+                      <p className="text-slate-600 font-bold">現在、未処理のアラートはありません。</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="flex flex-col gap-3">
                       {allAlerts.map(item => (
-                        <div key={item.date} className="bg-white rounded-lg border border-red-200 p-3 shadow-sm">
-                          <div className="flex justify-between items-center border-b border-red-100 pb-2 mb-2">
-                            <div className="font-bold text-red-800 flex items-center gap-1.5">
-                              <IconCalendar className="w-4 h-4" />
-                              {item.date.split('-')[1]}/{item.date.split('-')[2]} {getDayName(item.date)}
+                        <div key={item.date} className="bg-white border-l-4 border-red-500 rounded-r-lg shadow-sm p-3 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
+                          <div className="flex flex-col gap-1">
+                            <div className="font-bold text-slate-800 text-sm">
+                              {item.date.replace(/-/g, '/')} {getDayName(item.date)}
                             </div>
-                            <button 
-                              onClick={() => {
-                                setShowAlertsModal(false);
-                                const month = parseInt(item.date.split('-')[1], 10);
-                                const week = weeksData.find(w => w.dates.includes(item.date));
+                            <div className="flex flex-col gap-1 mt-1">
+                              {item.alerts.map((alt, i) => (
+                                <div key={i} className="text-xs font-bold text-red-600 flex items-start gap-1">
+                                  <IconAlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                  <span>{alt}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => {
+                              setShowAlertsModal(false);
+                              const month = parseInt(item.date.split('-')[1], 10);
+                              const week = weeksData.find(w => w.dates.includes(item.date));
+                              if (week) {
                                 setSelectedMonth(month);
                                 setSelectedWeek(week.id);
                                 setSelectedDate(item.date);
                                 setViewMode('day');
-                              }}
-                              className="text-xs bg-red-50 text-red-700 hover:bg-red-100 px-3 py-1.5 rounded font-bold transition-colors border border-red-200 flex items-center gap-1"
-                            >
-                              <IconEdit className="w-3.5 h-3.5" /> この日を編集
-                            </button>
-                          </div>
-                          <ul className="text-sm text-red-700 space-y-1.5">
-                            {item.alerts.map((alert, i) => (
-                              <li key={i} className="flex items-start gap-1.5">
-                                <IconAlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                                <span className="leading-tight">{alert}</span>
-                              </li>
-                            ))}
-                          </ul>
+                              }
+                            }}
+                            className="shrink-0 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded text-xs font-bold text-slate-700 transition-colors self-start sm:self-auto whitespace-nowrap"
+                          >
+                            該当日を確認
+                          </button>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
                 <div className="p-4 border-t border-slate-200 bg-white flex justify-end">
-                  <button 
-                    onClick={() => setShowAlertsModal(false)}
-                    className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold text-sm transition-colors border border-slate-300"
-                  >
+                  <button onClick={() => setShowAlertsModal(false)} className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold text-sm transition-colors border border-slate-300">
                     閉じる
                   </button>
                 </div>
               </div>
             </div>
           )}
+
         </div>
       );
     }
