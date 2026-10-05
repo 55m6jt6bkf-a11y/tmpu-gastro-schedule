@@ -701,6 +701,7 @@
       const [patternDay, setPatternDay] = useState(0);
       const [editingPatternData, setEditingPatternData] = useState([]);
       const [isSavingPattern, setIsSavingPattern] = useState(false);
+      const [copySourceMonth, setCopySourceMonth] = useState('');
 
       const [showStickyNav, setShowStickyNav] = useState(true);
       const [lastScrollY, setLastScrollY] = useState(0);
@@ -1333,6 +1334,7 @@
         setPatternMonth(initialMonth);
         setPatternWeek(0);
         setPatternDay(0);
+        setCopySourceMonth('');
         setShowPatternModal(true);
       };
 
@@ -1392,6 +1394,57 @@
           await setDoc(docRef, updateData, { merge: true });
         } catch(e) {
           console.error(e);
+        } finally {
+          setIsSavingPattern(false);
+        }
+      };
+
+      const handleCopyMonth = async () => {
+        if (!user || !copySourceMonth) return;
+        if (copySourceMonth === patternMonth) return;
+        
+        const sourceLabel = `${copySourceMonth.split('-')[0]}年${copySourceMonth.split('-')[1]}月`;
+        const targetLabel = `${patternMonth.split('-')[0]}年${patternMonth.split('-')[1]}月`;
+        
+        if (!confirm(`【確認】\n${sourceLabel} の基本出番表（すべての週・曜日）を、${targetLabel} にコピーしますか？\n\n※現在の ${targetLabel} の設定はすべて上書きされます。`)) return;
+        
+        setIsSavingPattern(true);
+        try {
+          const updateData = {
+            updatedAt: new Date().toISOString(),
+            updatedBy: user.uid
+          };
+          
+          const sourceData = customDefaultPatterns[copySourceMonth];
+          const splitDate = new Date('2026-10-01');
+          const sourceDateStr = `${copySourceMonth}-01`;
+          const isSourceOld = new Date(sourceDateStr) < splitDate;
+          
+          for (let w = 0; w < 5; w++) {
+            for (let d = 0; d < 5; d++) {
+              const key = `week${w}_day${d}`;
+              if (sourceData && sourceData[key] && sourceData[key] !== "RESET") {
+                 updateData[key] = sourceData[key];
+              } else {
+                 const basePattern = isSourceOld ? monthlyPatternsUntilSep[w][d] : monthlyPatternsFromOct[w][d];
+                 updateData[key] = JSON.stringify(basePattern);
+              }
+            }
+          }
+          
+          const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'default_patterns', patternMonth);
+          await setDoc(docRef, updateData, { merge: false });
+          
+          setCopySourceMonth('');
+          alert(`${targetLabel} に一括コピーしました。`);
+          
+          const currentKey = `week${patternWeek}_day${patternDay}`;
+          if (updateData[currentKey] && updateData[currentKey] !== "RESET") {
+            setEditingPatternData(JSON.parse(updateData[currentKey]));
+          }
+        } catch(e) {
+          console.error(e);
+          alert('コピーに失敗しました。');
         } finally {
           setIsSavingPattern(false);
         }
@@ -2994,46 +3047,69 @@
                   </button>
                 </div>
                 
-                <div className="p-4 bg-slate-100 border-b border-slate-200 shrink-0 flex flex-wrap gap-3 items-center">
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-bold text-slate-600">対象月</label>
+                <div className="p-4 bg-slate-100 border-b border-slate-200 shrink-0 flex flex-col sm:flex-row justify-between gap-4 items-start sm:items-center">
+                  <div className="flex flex-wrap gap-3 items-center">
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-bold text-slate-600">対象月</label>
+                      <select 
+                        value={patternMonth} 
+                        onChange={(e) => setPatternMonth(e.target.value)}
+                        className="border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-indigo-500 font-bold text-sm bg-white"
+                      >
+                        {patternMonthOptions.map(opt => (
+                          <option key={opt} value={opt}>{opt.split('-')[0]}年{opt.split('-')[1]}月</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-bold text-slate-600">週</label>
+                      <select 
+                        value={patternWeek} 
+                        onChange={(e) => setPatternWeek(Number(e.target.value))}
+                        className="border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-indigo-500 font-bold text-sm bg-white"
+                      >
+                        <option value={0}>第1週</option>
+                        <option value={1}>第2週</option>
+                        <option value={2}>第3週</option>
+                        <option value={3}>第4週</option>
+                        <option value={4}>第5週</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-bold text-slate-600">曜日</label>
+                      <select 
+                        value={patternDay} 
+                        onChange={(e) => setPatternDay(Number(e.target.value))}
+                        className="border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-indigo-500 font-bold text-sm bg-white"
+                      >
+                        <option value={0}>月曜日</option>
+                        <option value={1}>火曜日</option>
+                        <option value={2}>水曜日</option>
+                        <option value={3}>木曜日</option>
+                        <option value={4}>金曜日</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 bg-indigo-50 px-3 py-1.5 rounded border border-indigo-200 w-full sm:w-auto shrink-0 shadow-sm">
+                    <span className="text-xs font-bold text-indigo-800 whitespace-nowrap">月一括コピー</span>
                     <select 
-                      value={patternMonth} 
-                      onChange={(e) => setPatternMonth(e.target.value)}
-                      className="border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-indigo-500 font-bold text-sm bg-white"
+                      value={copySourceMonth} 
+                      onChange={(e) => setCopySourceMonth(e.target.value)}
+                      className="border border-indigo-300 rounded px-2 py-1 outline-none focus:border-indigo-500 font-bold text-xs bg-white flex-1 sm:flex-none text-indigo-900"
                     >
+                      <option value="">他の月を選択</option>
                       {patternMonthOptions.map(opt => (
-                        <option key={opt} value={opt}>{opt.split('-')[0]}年{opt.split('-')[1]}月</option>
+                        <option key={opt} value={opt} disabled={opt === patternMonth}>{opt.split('-')[0]}年{opt.split('-')[1]}月</option>
                       ))}
                     </select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-bold text-slate-600">週</label>
-                    <select 
-                      value={patternWeek} 
-                      onChange={(e) => setPatternWeek(Number(e.target.value))}
-                      className="border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-indigo-500 font-bold text-sm bg-white"
+                    <button 
+                      onClick={handleCopyMonth}
+                      disabled={!copySourceMonth || isSavingPattern}
+                      className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-bold transition-colors disabled:opacity-50 shrink-0"
                     >
-                      <option value={0}>第1週</option>
-                      <option value={1}>第2週</option>
-                      <option value={2}>第3週</option>
-                      <option value={3}>第4週</option>
-                      <option value={4}>第5週</option>
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-bold text-slate-600">曜日</label>
-                    <select 
-                      value={patternDay} 
-                      onChange={(e) => setPatternDay(Number(e.target.value))}
-                      className="border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-indigo-500 font-bold text-sm bg-white"
-                    >
-                      <option value={0}>月曜日</option>
-                      <option value={1}>火曜日</option>
-                      <option value={2}>水曜日</option>
-                      <option value={3}>木曜日</option>
-                      <option value={4}>金曜日</option>
-                    </select>
+                      コピー
+                    </button>
                   </div>
                 </div>
 
