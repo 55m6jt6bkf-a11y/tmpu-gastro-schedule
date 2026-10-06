@@ -48,6 +48,14 @@
       animation: flash-text 2s ease-in-out infinite;
     }
 
+    @keyframes urgent-blink {
+      0%, 49% { opacity: 1; transform: scale(1.1); text-shadow: 0 0 10px rgba(220, 38, 38, 0.6); }
+      50%, 100% { opacity: 0.2; transform: scale(1); text-shadow: none; }
+    }
+    .animate-urgent-blink {
+      animation: urgent-blink 0.8s infinite;
+    }
+
     /* 印刷用スタイル設定 */
     @media print {
       @page {
@@ -3121,9 +3129,9 @@
           {showUrgentAlertModal && urgentAlertData && (
             <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-[60] backdrop-blur-sm print:hidden">
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border-2 border-red-400">
-                <div className="bg-red-50 p-4 border-b border-red-200 flex items-center gap-3">
-                  <div className="bg-red-100 p-2 rounded-full text-red-600">
-                    <IconAlertTriangle className="w-6 h-6 animate-pulse" />
+                <div className="bg-red-50 p-4 border-b border-red-200 flex items-center gap-4">
+                  <div className="bg-red-100 p-2.5 rounded-full text-red-600 animate-urgent-blink">
+                    <IconAlertTriangle className="w-8 h-8" />
                   </div>
                   <div>
                     <h3 className="font-black text-red-800 text-lg leading-tight">急遽の出番変更のお知らせ</h3>
