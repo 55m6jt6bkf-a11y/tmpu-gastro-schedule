@@ -707,6 +707,12 @@
       const [batchOnCalls, setBatchOnCalls] = useState({});
       const [isBatchSaving, setIsBatchSaving] = useState(false);
 
+      const [globalNotice, setGlobalNotice] = useState(null);
+      const [showGlobalNoticeModal, setShowGlobalNoticeModal] = useState(false);
+      const [showNoticeManageModal, setShowNoticeManageModal] = useState(false);
+      const [noticeMessageInput, setNoticeMessageInput] = useState('');
+      const [isSendingNotice, setIsSendingNotice] = useState(false);
+
       const [showPatternModal, setShowPatternModal] = useState(false);
       const [patternMonth, setPatternMonth] = useState('');
       const [patternWeek, setPatternWeek] = useState(0);
@@ -831,9 +837,19 @@
           setCustomDefaultPatterns(patterns);
         });
         
+        const globalNoticeRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'global', 'notice');
+        const globalNoticeUnsub = onSnapshot(globalNoticeRef, (snapshot) => {
+          if (snapshot.exists()) {
+            setGlobalNotice(snapshot.data());
+          } else {
+            setGlobalNotice(null);
+          }
+        });
+        
         return () => {
           unsubscribers.forEach(unsub => unsub());
           patternUnsub();
+          globalNoticeUnsub();
         };
       }, [user]);
 
@@ -918,6 +934,17 @@
         }
 
       }, [schedulesMetadata, isLoading]);
+
+      useEffect(() => {
+        if (globalNotice && globalNotice.active && globalNotice.updatedAt) {
+          const noticeTime = new Date(globalNotice.updatedAt).getTime();
+          const sessionKey = `global_notice_${noticeTime}`;
+          if (!sessionStorage.getItem(sessionKey)) {
+            setShowGlobalNoticeModal(true);
+            sessionStorage.setItem(sessionKey, 'true');
+          }
+        }
+      }, [globalNotice]);
 
       const handleMonthChange = (month) => {
         setSelectedMonth(month);
@@ -1827,6 +1854,205 @@
         saveAs(blob, fileName);
       };
 
+      // --- 日中当番作成用エクスポート機能 ---
+      const handleExportForOnCallCreation = async () => {
+        const year = new Date(selectedDate).getFullYear();
+        const month = selectedMonth;
+        
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 0); // 月末日
+        
+        const exportDates = [];
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          exportDates.push(`${yyyy}-${mm}-${dd}`);
+        }
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet(`日中当番作成用_${month}月`);
+
+        // ヘッダー設定
+        worksheet.columns = [
+          { header: '日付', key: 'date', width: 12 },
+          { header: '新患', key: 'shinkan', width: 25 },
+          { header: '外勤', key: 'gaikin', width: 35 },
+          { header: '当直', key: 'duty', width: 15 },
+          { header: '明け', key: 'postDuty', width: 15 },
+          { header: 'その他休暇', key: 'otherLeaves', width: 25 },
+        ];
+
+        // ヘッダースタイル
+        const headerRow = worksheet.getRow(1);
+        headerRow.eachCell((cell) => {
+          cell.font = { bold: true };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+        });
+
+        const gaikinStartIndex = MASTER_ROLE_ORDER.indexOf('若林EGD');
+        const EXTERNAL_ROLES = MASTER_ROLE_ORDER.slice(gaikinStartIndex);
+
+        const formatNameForExcel = (str) => {
+          let pure = getPureName(str);
+          // (潤) や (陽) などとして残ったカッコも、出力時には外して「山田潤」などにする
+          return pure.replace(/[（\(](.*?)[）\)]/g, '$1').trim();
+        };
+
+        const extractNames = (items) => {
+          let names = [];
+          items.forEach(item => {
+            if (!item || !item.staff) return;
+            const staffNames = item.staff.split(/[\s,、・]+|or/).map(n => formatNameForExcel(n)).filter(n => n.length > 0 && n !== 'なし');
+            names = names.concat(staffNames);
+          });
+          return [...new Set(names)]; // 重複排除
+        };
+
+        const parseLeavesForExport = (leaveStr) => {
+          const result = { duty: [], postDuty: [], others: [] };
+          if (!leaveStr) return result;
+          
+          const entries = leaveStr.split(/[\s,、・]+|or/).filter(e => e.trim().length > 0);
+          
+          entries.forEach(entry => {
+            let name = formatNameForExcel(entry);
+            if (name.length === 0) return;
+
+            if (entry.includes('当直')) {
+              result.duty.push(name);
+            } else if (entry.includes('明け')) {
+              result.postDuty.push(name);
+            } else {
+              result.others.push(name);
+            }
+          });
+          return result;
+        };
+
+        exportDates.forEach(dateStr => {
+          const dayOfWeek = new Date(dateStr).getDay();
+          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+          const isHol = isWeekend ? false : (pendingHolidays[dateStr] !== undefined ? pendingHolidays[dateStr] : (holidays[dateStr] !== undefined ? holidays[dateStr] : defaultHolidays[dateStr]));
+
+          const dayData = pendingChanges[dateStr] || schedules[dateStr] || defaultSchedules[dateStr] || [];
+          
+          let shinkanStr = '';
+          let gaikinStr = '';
+          let dutyStr = '';
+          let postDutyStr = '';
+          let otherLeavesStr = '';
+
+          if (!isWeekend && !isHol && dayData.length > 0) {
+            // 休暇者
+            const leavesData = dayData[0]?.staff || '';
+            const leaves = parseLeavesForExport(leavesData);
+            dutyStr = leaves.duty.join('、');
+            postDutyStr = leaves.postDuty.join('、');
+            otherLeavesStr = leaves.others.join('、');
+
+            const shinkanItems = [];
+            const gaikinItems = [];
+            let isCurrentSectionGaikin = false;
+
+            dayData.forEach(item => {
+              const role = item.role;
+              const masterIdx = MASTER_ROLE_ORDER.indexOf(role);
+              if (masterIdx !== -1) {
+                isCurrentSectionGaikin = masterIdx >= gaikinStartIndex;
+              }
+              
+              if (role.includes('新患')) {
+                shinkanItems.push(item);
+              } else if (isCurrentSectionGaikin) {
+                gaikinItems.push(item);
+              }
+            });
+
+            shinkanStr = extractNames(shinkanItems).join('、');
+            gaikinStr = extractNames(gaikinItems).join('、');
+          }
+
+          if (isHol) {
+            otherLeavesStr = '休診日';
+          }
+
+          const row = worksheet.addRow({
+            date: `${dateStr.split('-')[1]}/${dateStr.split('-')[2]}${getDayName(dateStr)}`,
+            shinkan: shinkanStr,
+            gaikin: gaikinStr,
+            duty: dutyStr,
+            postDuty: postDutyStr,
+            otherLeaves: otherLeavesStr
+          });
+
+          // スタイル適用
+          row.eachCell((cell, colNumber) => {
+            cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+            cell.alignment = { vertical: 'middle', horizontal: colNumber === 1 ? 'center' : 'left', wrapText: true };
+            
+            if (isWeekend) {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+            } else if (isHol) {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF1F2' } };
+            }
+          });
+
+          const dateCell = row.getCell(1);
+          if (dayOfWeek === 6) {
+             dateCell.font = { color: { argb: 'FF2563EB' } }; // blue-600
+          } else if (dayOfWeek === 0 || isHol) {
+             dateCell.font = { color: { argb: 'FFE11D48' } }; // rose-600
+          }
+        });
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        saveAs(blob, `日中当番作成用_${year}年${month}月.xlsx`);
+      };
+
+      const handleSendGlobalNotice = async () => {
+        if (!user) return;
+        if (!noticeMessageInput.trim()) {
+          alert('メッセージを入力してください。');
+          return;
+        }
+        setIsSendingNotice(true);
+        try {
+          const noticeRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'global', 'notice');
+          await setDoc(noticeRef, {
+            message: noticeMessageInput,
+            updatedAt: new Date().toISOString(),
+            updatedBy: user.uid,
+            active: true
+          });
+          setShowNoticeManageModal(false);
+          alert('通知を発信しました。全員の画面にポップアップ表示されます。');
+        } catch(e) {
+          console.error(e);
+          alert('発信に失敗しました。');
+        } finally {
+          setIsSendingNotice(false);
+        }
+      };
+
+      const handleStopGlobalNotice = async () => {
+        if (!user) return;
+        setIsSendingNotice(true);
+        try {
+          const noticeRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'global', 'notice');
+          await setDoc(noticeRef, { active: false }, { merge: true });
+          setShowNoticeManageModal(false);
+          alert('現在の通知を停止しました。');
+        } catch(e) {
+          console.error(e);
+        } finally {
+          setIsSendingNotice(false);
+        }
+      };
+
       const handleLogin = (e) => {
         e.preventDefault();
         if (password === '5101') {
@@ -2409,11 +2635,28 @@
                     アラート一覧
                   </button>
                   <button 
+                    onClick={handleExportForOnCallCreation}
+                    className="flex items-center justify-center gap-1.5 bg-white border border-purple-300 text-purple-700 hover:bg-purple-50 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm w-full sm:w-auto"
+                  >
+                    <IconFileText className="w-3.5 h-3.5" />
+                    日中当番作成用Excel
+                  </button>
+                  <button 
                     onClick={openBatchOnCallModal}
                     className="flex items-center justify-center gap-1.5 bg-white border border-indigo-300 text-indigo-700 hover:bg-indigo-50 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm w-full sm:w-auto"
                   >
                     <IconClock className="w-3.5 h-3.5" />
                     日中当番一括入力
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setNoticeMessageInput(globalNotice?.active ? globalNotice.message : '');
+                      setShowNoticeManageModal(true);
+                    }}
+                    className="flex items-center justify-center gap-1.5 bg-white border border-orange-300 text-orange-700 hover:bg-orange-50 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm w-full sm:w-auto"
+                  >
+                    <IconMegaphone className="w-3.5 h-3.5" />
+                    全体ポップアップ通知
                   </button>
                   <button 
                     onClick={() => setShowStatsModal(true)}
@@ -3177,6 +3420,86 @@
                     className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-md font-bold text-sm transition-colors shadow-sm"
                   >
                     該当日を確認する
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 全体ポップアップ通知 (閲覧者用) */}
+          {showGlobalNoticeModal && globalNotice && (
+            <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-[70] backdrop-blur-sm print:hidden">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border-2 border-orange-400">
+                <div className="bg-orange-50 p-4 border-b border-orange-200 flex items-center gap-4">
+                  <div className="bg-orange-100 p-2.5 rounded-full text-orange-600 animate-pulse">
+                    <IconMegaphone className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-orange-800 text-lg leading-tight">管理者からのお知らせ</h3>
+                    <p className="text-orange-600 text-xs font-bold mt-0.5">
+                      {new Date(globalNotice.updatedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 発信
+                    </p>
+                  </div>
+                </div>
+                <div className="p-5 bg-white max-h-[50vh] overflow-y-auto">
+                  <div className="text-sm text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">
+                    {globalNotice.message}
+                  </div>
+                </div>
+                <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
+                  <button 
+                    onClick={() => setShowGlobalNoticeModal(false)}
+                    className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-md font-bold text-sm transition-colors shadow-sm"
+                  >
+                    確認しました
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 全体ポップアップ通知管理 (管理者用) */}
+          {showNoticeManageModal && (
+            <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-[65] backdrop-blur-sm print:hidden">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-orange-50">
+                  <h3 className="font-bold text-base flex items-center gap-1.5 text-orange-800">
+                    <IconMegaphone className="w-5 h-5" />
+                    全体ポップアップ通知の発信
+                  </h3>
+                  <button onClick={() => setShowNoticeManageModal(false)} className="p-1 hover:bg-orange-200 rounded text-orange-600 transition-colors">
+                    <IconX className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <div className="p-5">
+                  <p className="text-xs text-slate-600 mb-3 font-medium">
+                    ここで発信した内容は、システムを開いているすべてのユーザーの画面にポップアップとして強制的に表示されます。（重要な連絡用）
+                  </p>
+                  
+                  {globalNotice && globalNotice.active && (
+                    <div className="mb-4 p-3 bg-orange-100 border border-orange-300 rounded text-sm text-orange-900 font-bold flex justify-between items-center gap-2">
+                      <span>現在、通知がアクティブ（発信中）です。</span>
+                      <button onClick={handleStopGlobalNotice} disabled={isSendingNotice} className="px-3 py-1.5 bg-white text-orange-700 border border-orange-400 rounded hover:bg-orange-50 text-xs shrink-0 disabled:opacity-50 font-bold shadow-sm">
+                        通知を停止
+                      </button>
+                    </div>
+                  )}
+                  
+                  <textarea
+                    value={noticeMessageInput}
+                    onChange={(e) => setNoticeMessageInput(e.target.value)}
+                    placeholder="通知するメッセージを入力してください..."
+                    className="w-full h-32 p-3 border-2 border-slate-300 rounded-md outline-none focus:border-orange-500 transition-colors text-sm mb-4"
+                  />
+                  
+                  <button 
+                    onClick={handleSendGlobalNotice}
+                    disabled={isSendingNotice || !noticeMessageInput.trim()}
+                    className="w-full py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-md shadow-sm transition-colors text-sm disabled:opacity-50 flex justify-center items-center gap-2"
+                  >
+                    {isSendingNotice ? <IconLoader2 className="w-4 h-4" /> : <IconMegaphone className="w-4 h-4" />}
+                    この内容でポップアップを発信する
                   </button>
                 </div>
               </div>
