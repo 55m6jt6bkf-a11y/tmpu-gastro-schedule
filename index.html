@@ -56,6 +56,14 @@
       animation: urgent-blink 0.8s infinite;
     }
 
+    @keyframes notice-blink {
+      0%, 49% { opacity: 1; transform: scale(1.1); text-shadow: 0 0 10px rgba(234, 88, 12, 0.6); }
+      50%, 100% { opacity: 0.2; transform: scale(1); text-shadow: none; }
+    }
+    .animate-notice-blink {
+      animation: notice-blink 0.8s infinite;
+    }
+
     /* 印刷用スタイル設定 */
     @media print {
       @page {
@@ -3431,11 +3439,11 @@
             <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-[70] backdrop-blur-sm print:hidden">
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border-2 border-orange-400">
                 <div className="bg-orange-50 p-4 border-b border-orange-200 flex items-center gap-4">
-                  <div className="bg-orange-100 p-2.5 rounded-full text-orange-600 animate-pulse">
+                  <div className="bg-orange-100 p-2.5 rounded-full text-orange-600 animate-notice-blink">
                     <IconMegaphone className="w-8 h-8" />
                   </div>
                   <div>
-                    <h3 className="font-black text-orange-800 text-lg leading-tight">管理者からのお知らせ</h3>
+                    <h3 className="font-black text-orange-800 text-lg leading-tight">重要なお知らせ</h3>
                     <p className="text-orange-600 text-xs font-bold mt-0.5">
                       {new Date(globalNotice.updatedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 発信
                     </p>
