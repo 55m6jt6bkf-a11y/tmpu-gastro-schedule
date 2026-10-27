@@ -629,7 +629,7 @@
         if (foundBooths.length > 0) {
           const invalidBooths = foundBooths.filter(role => {
             if (ALLOWED_ONCALL_ROLES.includes(role)) return false;
-            if (isSecondCall && role.includes('新患')) return false; // 2nd Callは新患と兼任OK
+            if (isSecondCall && (role.includes('新患') || role.includes('再診'))) return false; // 2nd Callは新患・再診と兼任OK
             return true;
           });
           if (invalidBooths.length > 0) {
