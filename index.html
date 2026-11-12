@@ -673,6 +673,7 @@
     function App() {
       const [user, setUser] = useState(null);
       const [customDefaultPatterns, setCustomDefaultPatterns] = useState({});
+      const [dynamicDefaultSchedules, setDynamicDefaultSchedules] = useState(defaultSchedules);
 
       const [schedules, setSchedules] = useState({});
       const [holidays, setHolidays] = useState({});
@@ -727,7 +728,7 @@
       const [patternDay, setPatternDay] = useState(0);
       const [editingPatternData, setEditingPatternData] = useState([]);
       const [isSavingPattern, setIsSavingPattern] = useState(false);
-      const [copySourceMonth, setCopySourceMonth] = useState('');
+      const [copySourceOption, setCopySourceOption] = useState('');
       
       const todayStr = getTodayStr();
 
@@ -862,6 +863,33 @@
       }, [user]);
 
       useEffect(() => {
+        const newDefaults = JSON.parse(JSON.stringify(defaultSchedules));
+        weeksData.forEach(week => {
+          week.dates.forEach(dateStr => {
+            const d = new Date(dateStr);
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const monthKey = `${yyyy}-${mm}`;
+            
+            const weekIndex = getWeekOfMonthIndex(d);
+            const dayIndex = d.getDay() - 1;
+            
+            if (dayIndex >= 0 && dayIndex <= 4 && weekIndex >= 0 && weekIndex <= 4) {
+              const customDoc = customDefaultPatterns[monthKey];
+              const customKey = `week${weekIndex}_day${dayIndex}`;
+              
+              if (customDoc && customDoc[customKey] && customDoc[customKey] !== "RESET") {
+                try {
+                  newDefaults[dateStr] = JSON.parse(customDoc[customKey]);
+                } catch(e) {}
+              }
+            }
+          });
+        });
+        setDynamicDefaultSchedules(newDefaults);
+      }, [customDefaultPatterns]);
+
+      useEffect(() => {
         const handleScroll = () => {
           const currentScrollY = window.scrollY;
           
@@ -969,7 +997,7 @@
       // 動的生成されたデフォルトデータをフォールバックとして使用
       const activeData = pendingChanges[selectedDate] 
         ? pendingChanges[selectedDate] 
-        : (schedules[selectedDate] ? JSON.parse(JSON.stringify(schedules[selectedDate])) : JSON.parse(JSON.stringify(defaultSchedules[selectedDate] || [])));
+        : (schedules[selectedDate] ? JSON.parse(JSON.stringify(schedules[selectedDate])) : JSON.parse(JSON.stringify(dynamicDefaultSchedules[selectedDate] || [])));
 
       const activeIsHoliday = pendingHolidays[selectedDate] !== undefined ? pendingHolidays[selectedDate] : (holidays[selectedDate] !== undefined ? holidays[selectedDate] : defaultHolidays[selectedDate]);
       const activeOnCall = pendingOnCalls[selectedDate] !== undefined ? pendingOnCalls[selectedDate] : (onCalls[selectedDate] || defaultOnCalls[selectedDate] || { first: '', second: '' });
@@ -1063,7 +1091,7 @@
           
           const promises = Array.from(changedDates).map(dateKey => {
             const docRef = doc(schedulesRef, dateKey);
-            const oldStaffData = schedules[dateKey] || defaultSchedules[dateKey] || [];
+            const oldStaffData = schedules[dateKey] || dynamicDefaultSchedules[dateKey] || [];
             const newStaffData = pendingChanges[dateKey] ? pendingChanges[dateKey] : oldStaffData;
             
             const oldHol = holidays[dateKey] !== undefined ? holidays[dateKey] : defaultHolidays[dateKey];
@@ -1427,7 +1455,7 @@
         setPatternMonth(initialMonth);
         setPatternWeek(0);
         setPatternDay(0);
-        setCopySourceMonth('');
+        setCopySourceOption('');
         setShowPatternModal(true);
       };
 
@@ -1492,54 +1520,107 @@
         }
       };
 
-      const handleCopyMonth = async () => {
-        if (!user || !copySourceMonth) return;
-        if (copySourceMonth === patternMonth) return;
+      const handleCopyExecute = async () => {
+        if (!user || !copySourceOption) return;
         
-        const sourceLabel = `${copySourceMonth.split('-')[0]}年${copySourceMonth.split('-')[1]}月`;
-        const targetLabel = `${patternMonth.split('-')[0]}年${patternMonth.split('-')[1]}月`;
-        
-        if (!confirm(`【確認】\n${sourceLabel} の基本出番表（すべての週・曜日）を、${targetLabel} にコピーしますか？\n\n※現在の ${targetLabel} の設定はすべて上書きされます。`)) return;
-        
-        setIsSavingPattern(true);
-        try {
-          const updateData = {
-            updatedAt: new Date().toISOString(),
-            updatedBy: user.uid
-          };
+        if (copySourceOption.startsWith('month:')) {
+          const copySourceMonth = copySourceOption.split(':')[1];
+          if (copySourceMonth === patternMonth) return;
           
-          const sourceData = customDefaultPatterns[copySourceMonth];
-          const splitDate = new Date('2026-10-01');
-          const sourceDateStr = `${copySourceMonth}-01`;
-          const isSourceOld = new Date(sourceDateStr) < splitDate;
+          const sourceLabel = `${copySourceMonth.split('-')[0]}年${copySourceMonth.split('-')[1]}月`;
+          const targetLabel = `${patternMonth.split('-')[0]}年${patternMonth.split('-')[1]}月`;
           
-          for (let w = 0; w < 5; w++) {
-            for (let d = 0; d < 5; d++) {
-              const key = `week${w}_day${d}`;
-              if (sourceData && sourceData[key] && sourceData[key] !== "RESET") {
-                 updateData[key] = sourceData[key];
-              } else {
-                 const basePattern = isSourceOld ? monthlyPatternsUntilSep[w][d] : monthlyPatternsFromOct[w][d];
-                 updateData[key] = JSON.stringify(basePattern);
+          if (!confirm(`【確認】\n${sourceLabel} の基本出番表（すべての週・曜日）を、${targetLabel} にコピーしますか？\n\n※現在の ${targetLabel} の設定はすべて上書きされます。`)) return;
+          
+          setIsSavingPattern(true);
+          try {
+            const updateData = {
+              updatedAt: new Date().toISOString(),
+              updatedBy: user.uid
+            };
+            
+            const sourceData = customDefaultPatterns[copySourceMonth];
+            const splitDate = new Date('2026-10-01');
+            const sourceDateStr = `${copySourceMonth}-01`;
+            const isSourceOld = new Date(sourceDateStr) < splitDate;
+            
+            for (let w = 0; w < 5; w++) {
+              for (let d = 0; d < 5; d++) {
+                const key = `week${w}_day${d}`;
+                if (sourceData && sourceData[key] && sourceData[key] !== "RESET") {
+                   updateData[key] = sourceData[key];
+                } else {
+                   const basePattern = isSourceOld ? monthlyPatternsUntilSep[w][d] : monthlyPatternsFromOct[w][d];
+                   updateData[key] = JSON.stringify(basePattern);
+                }
               }
             }
+            
+            const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'default_patterns', patternMonth);
+            await setDoc(docRef, updateData, { merge: false });
+            
+            setCopySourceOption('');
+            alert(`${targetLabel} に一括コピーしました。`);
+            
+            const currentKey = `week${patternWeek}_day${patternDay}`;
+            if (updateData[currentKey] && updateData[currentKey] !== "RESET") {
+              setEditingPatternData(JSON.parse(updateData[currentKey]));
+            }
+          } catch(e) {
+            console.error(e);
+            alert('コピーに失敗しました。');
+          } finally {
+            setIsSavingPattern(false);
           }
-          
-          const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'default_patterns', patternMonth);
-          await setDoc(docRef, updateData, { merge: false });
-          
-          setCopySourceMonth('');
-          alert(`${targetLabel} に一括コピーしました。`);
-          
-          const currentKey = `week${patternWeek}_day${patternDay}`;
-          if (updateData[currentKey] && updateData[currentKey] !== "RESET") {
-            setEditingPatternData(JSON.parse(updateData[currentKey]));
+        } else if (copySourceOption.startsWith('week:')) {
+          const sourceWeek = parseInt(copySourceOption.split(':')[1], 10);
+          if (sourceWeek === patternWeek) return;
+
+          const targetLabel = `第${patternWeek + 1}週`;
+          const sourceLabel = `第${sourceWeek + 1}週`;
+
+          if (!confirm(`【確認】\nこの月（${patternMonth.split('-')[1]}月）の ${sourceLabel} の設定（月〜金）を、${targetLabel} に一括コピーしますか？\n\n※現在の ${targetLabel} の設定は上書きされます。`)) return;
+
+          setIsSavingPattern(true);
+          try {
+            const updateData = {
+              updatedAt: new Date().toISOString(),
+              updatedBy: user.uid
+            };
+
+            const sourceData = customDefaultPatterns[patternMonth];
+            const splitDate = new Date('2026-10-01');
+            const targetDateStr = `${patternMonth}-01`;
+            const isTargetOld = new Date(targetDateStr) < splitDate;
+
+            for (let d = 0; d < 5; d++) {
+              const sourceKey = `week${sourceWeek}_day${d}`;
+              const targetKey = `week${patternWeek}_day${d}`;
+
+              if (sourceData && sourceData[sourceKey] && sourceData[sourceKey] !== "RESET") {
+                 updateData[targetKey] = sourceData[sourceKey];
+              } else {
+                 const basePattern = isTargetOld ? monthlyPatternsUntilSep[sourceWeek][d] : monthlyPatternsFromOct[sourceWeek][d];
+                 updateData[targetKey] = JSON.stringify(basePattern);
+              }
+            }
+
+            const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'default_patterns', patternMonth);
+            await setDoc(docRef, updateData, { merge: true });
+
+            setCopySourceOption('');
+            alert(`${targetLabel} に ${sourceLabel} の設定をコピーしました。`);
+
+            const currentKey = `week${patternWeek}_day${patternDay}`;
+            if (updateData[currentKey] && updateData[currentKey] !== "RESET") {
+              setEditingPatternData(JSON.parse(updateData[currentKey]));
+            }
+          } catch(e) {
+            console.error(e);
+            alert('コピーに失敗しました。');
+          } finally {
+            setIsSavingPattern(false);
           }
-        } catch(e) {
-          console.error(e);
-          alert('コピーに失敗しました。');
-        } finally {
-          setIsSavingPattern(false);
         }
       };
 
@@ -1571,7 +1652,7 @@
         const alertsList = [];
         allDates.forEach(d => {
           const isHol = pendingHolidays[d] !== undefined ? pendingHolidays[d] : (holidays[d] !== undefined ? holidays[d] : defaultHolidays[d]);
-          const daySchedules = pendingChanges[d] || schedules[d] || defaultSchedules[d];
+          const daySchedules = pendingChanges[d] || schedules[d] || dynamicDefaultSchedules[d];
           const onCallData = pendingOnCalls[d] !== undefined ? pendingOnCalls[d] : (onCalls[d] || {first:'', second:''});
           
           const dateAlerts = getAlertsForDate(d, daySchedules, isHol, onCallData);
@@ -1617,7 +1698,7 @@
           if (isHol) return; // 休診日はカウントしない
           
           // 保存済み、またはデフォルトのスケジュールデータを使用
-          const dayData = schedules[dateStr] || defaultSchedules[dateStr];
+          const dayData = schedules[dateStr] || dynamicDefaultSchedules[dateStr];
           const ocData = pendingOnCalls[dateStr] !== undefined ? pendingOnCalls[dateStr] : (onCalls[dateStr] || {first: '', second: ''});
           if (!dayData) return;
           
@@ -1709,13 +1790,13 @@
         
         const dates = exportDates;
 
-        const exportSchedules = dates.map(d => pendingChanges[d] || schedules[d] || defaultSchedules[d] || null);
-        const exportDefaultSchedules = dates.map(d => defaultSchedules[d] || null);
+        const exportSchedules = dates.map(d => pendingChanges[d] || schedules[d] || dynamicDefaultSchedules[d] || null);
+        const exportDefaultSchedules = dates.map(d => dynamicDefaultSchedules[d] || null);
         const exportHolidays = dates.map(d => pendingHolidays[d] !== undefined ? pendingHolidays[d] : (holidays[d] !== undefined ? holidays[d] : defaultHolidays[d]));
         const exportOnCalls = dates.map(d => pendingOnCalls[d] !== undefined ? pendingOnCalls[d] : (onCalls[d] || defaultOnCalls[d] || {first: '', second: ''}));
         
         // ヘルパー関数を使用してExcel出力の並び順を決定
-        const allRoles = getSortedRoles(dates, exportSchedules, defaultSchedules, MASTER_ROLE_ORDER);
+        const allRoles = getSortedRoles(dates, exportSchedules, dynamicDefaultSchedules, MASTER_ROLE_ORDER);
 
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet("スケジュール");
@@ -1945,7 +2026,7 @@
           const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
           const isHol = isWeekend ? false : (pendingHolidays[dateStr] !== undefined ? pendingHolidays[dateStr] : (holidays[dateStr] !== undefined ? holidays[dateStr] : defaultHolidays[dateStr]));
 
-          const dayData = pendingChanges[dateStr] || schedules[dateStr] || defaultSchedules[dateStr] || [];
+          const dayData = pendingChanges[dateStr] || schedules[dateStr] || dynamicDefaultSchedules[dateStr] || [];
           
           let shinkanStr = '';
           let gaikinStr = '';
@@ -2137,10 +2218,10 @@
 
       const renderWeekView = (isDigest = false) => {
         const weekDates = currentWeekData.dates;
-        const weekSchedules = weekDates.map(d => pendingChanges[d] || schedules[d] || defaultSchedules[d]);
+        const weekSchedules = weekDates.map(d => pendingChanges[d] || schedules[d] || dynamicDefaultSchedules[d]);
         const weekHolidays = weekDates.map(d => pendingHolidays[d] !== undefined ? pendingHolidays[d] : (holidays[d] !== undefined ? holidays[d] : defaultHolidays[d]));
         const weekOnCalls = weekDates.map(d => pendingOnCalls[d] !== undefined ? pendingOnCalls[d] : (onCalls[d] || {first: '', second: ''}));
-        const weekDefaultSchedules = weekDates.map(d => defaultSchedules[d]);
+        const weekDefaultSchedules = weekDates.map(d => dynamicDefaultSchedules[d]);
         
         // 週単位でエラー状態を事前計算
         const weekAlerts = weekDates.map((d, i) => {
@@ -2242,7 +2323,7 @@
         };
 
         // ヘルパー関数を使用して週別表示の並び順を決定（日別表示の並びを尊重）
-        const allRoles = getSortedRoles(weekDates, weekSchedules, defaultSchedules, MASTER_ROLE_ORDER);
+        const allRoles = getSortedRoles(weekDates, weekSchedules, dynamicDefaultSchedules, MASTER_ROLE_ORDER);
 
         const isRoleNewBoothInWeek = (role) => {
           return weekDefaultSchedules.every(defData => {
@@ -2863,8 +2944,8 @@
                       {boothsData.map((item, localIndex) => {
                         const dataIndex = localIndex + 1;
                         
-                        const isNewBooth = !defaultSchedules[selectedDate].some(defaultItem => defaultItem.role === item.role);
-                        const defaultStaffObj = defaultSchedules[selectedDate].find(d => d.role === item.role);
+                        const isNewBooth = !dynamicDefaultSchedules[selectedDate].some(defaultItem => defaultItem.role === item.role);
+                        const defaultStaffObj = dynamicDefaultSchedules[selectedDate].find(d => d.role === item.role);
                         const defaultStaff = defaultStaffObj ? defaultStaffObj.staff : null;
                         
                         const currentStaff = item.staff;
@@ -3549,13 +3630,20 @@
                 <div className="p-3 bg-white border-b border-slate-200 flex gap-2 items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-slate-700 whitespace-nowrap">一括コピー:</span>
-                    <select value={copySourceMonth} onChange={(e) => setCopySourceMonth(e.target.value)} className="p-1.5 rounded border border-slate-300 text-xs bg-slate-50">
+                    <select value={copySourceOption} onChange={(e) => setCopySourceOption(e.target.value)} className="p-1.5 rounded border border-slate-300 text-xs bg-slate-50">
                       <option value="">コピー元を選択</option>
-                      {patternMonthOptions.filter(m => m !== patternMonth).map(m => (
-                        <option key={m} value={m}>{m.split('-')[0]}年{m.split('-')[1]}月 の設定</option>
-                      ))}
+                      <optgroup label="月全体をコピー">
+                        {patternMonthOptions.filter(m => m !== patternMonth).map(m => (
+                          <option key={`month:${m}`} value={`month:${m}`}>{m.split('-')[0]}年{m.split('-')[1]}月 の設定</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="選択中の週へコピー">
+                        {[0, 1, 2, 3, 4].filter(w => w !== patternWeek).map(w => (
+                          <option key={`week:${w}`} value={`week:${w}`}>同じ月の第{w + 1}週</option>
+                        ))}
+                      </optgroup>
                     </select>
-                    <button onClick={handleCopyMonth} disabled={!copySourceMonth || isSavingPattern} className="px-3 py-1.5 bg-indigo-100 text-indigo-700 border border-indigo-300 rounded font-bold text-xs hover:bg-indigo-200 disabled:opacity-50 transition-colors whitespace-nowrap">
+                    <button onClick={handleCopyExecute} disabled={!copySourceOption || isSavingPattern} className="px-3 py-1.5 bg-indigo-100 text-indigo-700 border border-indigo-300 rounded font-bold text-xs hover:bg-indigo-200 disabled:opacity-50 transition-colors whitespace-nowrap">
                       適用
                     </button>
                   </div>
@@ -3681,7 +3769,7 @@
                     {Object.keys(batchOnCalls).sort().map(d => {
                       const dayStr = `${d.split('-')[1]}/${d.split('-')[2]}(${['日','月','火','水','木','金','土'][new Date(d).getDay()]})`;
                       const isHol = holidays[d] !== undefined ? holidays[d] : defaultHolidays[d];
-                      const daySchedules = schedules[d] || defaultSchedules[d] || [];
+                      const daySchedules = schedules[d] || dynamicDefaultSchedules[d] || [];
                       const pLeaves = parseLeaveNames(daySchedules[0]?.staff);
                       const bData = daySchedules.slice(1);
                       const oc1Error = checkOnCallConflicts(batchOnCalls[d].first, bData, pLeaves, false);
