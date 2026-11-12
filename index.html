@@ -337,9 +337,9 @@
 
     const generateWeeks = () => {
       const weeks = [];
-      // 8月から12月までに期間を拡張
-      let startDate = new Date('2026-08-01');
-      const endDate = new Date('2026-12-31');
+      // 10月から翌年3月までに期間を変更
+      let startDate = new Date('2026-10-01');
+      const endDate = new Date('2027-03-31');
       
       let weekIdCounter = 1;
       let currentWeek = null;
@@ -442,7 +442,7 @@
     };
     const defaultNotices = generateDefaultNotices();
 
-    const PUBLIC_HOLIDAYS = ['2026-08-11', '2026-09-21', '2026-09-22', '2026-09-23', '2026-10-12', '2026-11-03', '2026-11-23'];
+    const PUBLIC_HOLIDAYS = ['2026-10-12', '2026-11-03', '2026-11-23', '2027-01-01', '2027-01-11', '2027-02-11', '2027-02-23', '2027-03-22'];
     const defaultHolidays = {};
     weeksData.forEach(week => {
       week.dates.forEach(d => {
@@ -680,7 +680,7 @@
       const [notices, setNotices] = useState({});
       const [schedulesMetadata, setSchedulesMetadata] = useState({});
       
-      const [selectedMonth, setSelectedMonth] = useState(8);
+      const [selectedMonth, setSelectedMonth] = useState(10);
       const [selectedWeek, setSelectedWeek] = useState(weeksData[0].id);
       const [selectedDate, setSelectedDate] = useState(weeksData[0].dates[0]);
       const [viewMode, setViewMode] = useState('day');
@@ -1570,7 +1570,7 @@
         
         const alertsList = [];
         allDates.forEach(d => {
-          const isHol = pendingHolidays[d] !== undefined ? pendingHolidays[d] : holidays[d];
+          const isHol = pendingHolidays[d] !== undefined ? pendingHolidays[d] : (holidays[d] !== undefined ? holidays[d] : defaultHolidays[d]);
           const daySchedules = pendingChanges[d] || schedules[d] || defaultSchedules[d];
           const onCallData = pendingOnCalls[d] !== undefined ? pendingOnCalls[d] : (onCalls[d] || {first:'', second:''});
           
@@ -1613,7 +1613,7 @@
           
           if (!targetKey) return; // 3ヶ月分に該当しない日付はスキップ
           
-          const isHol = pendingHolidays[dateStr] !== undefined ? pendingHolidays[dateStr] : holidays[dateStr];
+          const isHol = pendingHolidays[dateStr] !== undefined ? pendingHolidays[dateStr] : (holidays[dateStr] !== undefined ? holidays[dateStr] : defaultHolidays[dateStr]);
           if (isHol) return; // 休診日はカウントしない
           
           // 保存済み、またはデフォルトのスケジュールデータを使用
@@ -2138,7 +2138,7 @@
       const renderWeekView = (isDigest = false) => {
         const weekDates = currentWeekData.dates;
         const weekSchedules = weekDates.map(d => pendingChanges[d] || schedules[d] || defaultSchedules[d]);
-        const weekHolidays = weekDates.map(d => pendingHolidays[d] !== undefined ? pendingHolidays[d] : holidays[d]);
+        const weekHolidays = weekDates.map(d => pendingHolidays[d] !== undefined ? pendingHolidays[d] : (holidays[d] !== undefined ? holidays[d] : defaultHolidays[d]));
         const weekOnCalls = weekDates.map(d => pendingOnCalls[d] !== undefined ? pendingOnCalls[d] : (onCalls[d] || {first: '', second: ''}));
         const weekDefaultSchedules = weekDates.map(d => defaultSchedules[d]);
         
@@ -2605,7 +2605,7 @@
                     const [, month, day] = dateStr.split('-');
                     const isSelected = selectedDate === dateStr;
                     const hasChanges = pendingChanges[dateStr] !== undefined || pendingHolidays[dateStr] !== undefined || pendingOnCalls[dateStr] !== undefined || pendingNotices[dateStr] !== undefined;
-                    const isHol = pendingHolidays[dateStr] !== undefined ? pendingHolidays[dateStr] : holidays[dateStr];
+                    const isHol = pendingHolidays[dateStr] !== undefined ? pendingHolidays[dateStr] : (holidays[dateStr] !== undefined ? holidays[dateStr] : defaultHolidays[dateStr]);
                     
                     return (
                       <button
@@ -3680,7 +3680,7 @@
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {Object.keys(batchOnCalls).sort().map(d => {
                       const dayStr = `${d.split('-')[1]}/${d.split('-')[2]}(${['日','月','火','水','木','金','土'][new Date(d).getDay()]})`;
-                      const isHol = holidays[d] || defaultHolidays[d];
+                      const isHol = holidays[d] !== undefined ? holidays[d] : defaultHolidays[d];
                       const daySchedules = schedules[d] || defaultSchedules[d] || [];
                       const pLeaves = parseLeaveNames(daySchedules[0]?.staff);
                       const bData = daySchedules.slice(1);
