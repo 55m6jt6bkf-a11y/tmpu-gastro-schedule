@@ -2577,7 +2577,7 @@
                     const [, month, day] = dateStr.split('-');
                     const isSelected = selectedDate === dateStr;
                     const hasChanges = pendingChanges[dateStr] !== undefined || pendingHolidays[dateStr] !== undefined || pendingOnCalls[dateStr] !== undefined || pendingNotices[dateStr] !== undefined;
-                    const isHol = pendingHolidays[dateStr] !== undefined ? pendingHolidays[dateStr] : holidays[dateStr];
+                    const isHol = pendingHolidays[dateStr] !== undefined ? pendingHolidays[dateStr] : (holidays[dateStr] !== undefined ? holidays[dateStr] : defaultHolidays[dateStr]);
                     
                     return (
                       <button
